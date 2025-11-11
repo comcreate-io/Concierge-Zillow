@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
@@ -20,11 +20,14 @@ export const metadata: Metadata = {
     ],
     shortcut: ['/logo/CL%20Balck%20LOGO%20.png'],
   },
+  manifest: '/site.webmanifest',
+}
+
+export const viewport: Viewport = {
   themeColor: [
     { media: '(prefers-color-scheme: dark)', color: '#000000' },
     { media: '(prefers-color-scheme: light)', color: '#000000' },
   ],
-  manifest: '/site.webmanifest',
 }
 
 export default function RootLayout({
