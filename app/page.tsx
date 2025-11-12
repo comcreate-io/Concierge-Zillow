@@ -194,17 +194,19 @@ export default async function HomePage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-3 text-white/80 hover:text-white transition-colors group">
                     <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                      <Phone className="h-5 w-5" />
+                    </div>
+                    <a href="tel:+18186424050" className="text-sm">
+                      +1 (818) 642-4050
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-3 text-white/80 hover:text-white transition-colors group">
+                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
                       <Mail className="h-5 w-5" />
                     </div>
                     <a href="mailto:diego@comcreate.org" className="text-sm">
                       diego@comcreate.org
                     </a>
-                  </div>
-                  <div className="flex items-center gap-3 text-white/80">
-                    <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center">
-                      <Clock className="h-5 w-5" />
-                    </div>
-                    <span className="text-sm">24/7 Available</span>
                   </div>
                 </div>
               </div>
