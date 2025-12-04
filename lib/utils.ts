@@ -56,3 +56,19 @@ export function formatNumber(value: string | number): string {
   // Format with comma separators
   return number.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
+
+// Check if a property value is valid (not empty, not "Contact for" text, and is a number)
+export function isValidPropertyValue(value: string | number | null | undefined): boolean {
+  if (value === null || value === undefined) return false
+  const strValue = String(value).trim().toLowerCase()
+  if (strValue === '' || strValue === '0') return false
+  if (strValue.includes('contact')) return false
+  // Check if it contains at least one digit
+  return /\d/.test(strValue)
+}
+
+// Format property value or return dash for invalid values
+export function formatPropertyValue(value: string | number | null | undefined, formatter?: (v: string | number) => string): string {
+  if (!isValidPropertyValue(value)) return '—'
+  return formatter ? formatter(value!) : String(value)
+}

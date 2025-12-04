@@ -767,4 +767,56 @@
   .hover\:pause-animation:hover {
     animation-play-state: paused;
   }
+
+  /* Markdown/Prose Styles for Property Descriptions */
+  .prose-property {
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.8;
+  }
+
+  .prose-property p {
+    margin-bottom: 1.25rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .prose-property strong {
+    color: #ffffff;
+    font-weight: 600;
+  }
+
+  .prose-property h2,
+  .prose-property h3 {
+    color: #ffffff;
+    font-weight: 700;
+    margin-top: 1.75rem;
+    margin-bottom: 0.75rem;
+    letter-spacing: 0.05em;
+  }
+
+  .prose-property ul {
+    list-style-type: none;
+    padding-left: 0;
+    margin: 1rem 0;
+  }
+
+  .prose-property ul li {
+    position: relative;
+    padding-left: 1.5rem;
+    margin-bottom: 0.5rem;
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  .prose-property ul li::before {
+    content: '•';
+    position: absolute;
+    left: 0;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .prose-property hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.3), transparent);
+    margin: 1.5rem 0;
+  }
 }

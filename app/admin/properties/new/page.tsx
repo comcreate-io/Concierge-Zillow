@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
-import { Home, Users, Sparkles, ArrowLeft, CheckCircle2, Edit3, Link2 } from "lucide-react"
+import { Home, Users, Sparkles, ArrowLeft, CheckCircle2, Edit3, Link2, Wand2 } from "lucide-react"
 import { saveProperty } from "@/lib/supabase"
 import { PropertyManagerSelect, PropertyManager } from "@/components/property-manager-select"
 import { assignPropertyToManagers } from "@/lib/actions/properties"
@@ -22,6 +22,46 @@ export default function AddPropertyPage() {
   const [propertyManagers, setPropertyManagers] = useState<PropertyManager[]>([])
   const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
   const [success, setSuccess] = useState(false)
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false)
+
+  // Function to generate AI description
+  const generateAIDescription = async (propertyId: string, propertyData: {
+    address?: string
+    monthly_rent?: string
+    bedrooms?: string
+    bathrooms?: string
+    area?: string
+  }) => {
+    try {
+      setIsGeneratingDescription(true)
+      const response = await fetch('/api/generate-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          propertyId,
+          address: propertyData.address,
+          monthly_rent: propertyData.monthly_rent,
+          bedrooms: propertyData.bedrooms,
+          bathrooms: propertyData.bathrooms,
+          area: propertyData.area,
+        }),
+      })
+
+      if (!response.ok) {
+        console.error('Failed to generate AI description')
+        return false
+      }
+
+      const data = await response.json()
+      console.log('AI description generated:', data.description?.substring(0, 100) + '...')
+      return true
+    } catch (error) {
+      console.error('Error generating AI description:', error)
+      return false
+    } finally {
+      setIsGeneratingDescription(false)
+    }
+  }
 
   // Manual input fields
   const [manualData, setManualData] = useState({
@@ -68,10 +108,10 @@ export default function AddPropertyPage() {
 
       const newProperty = {
         address: manualData.address,
-        monthly_rent: manualData.monthly_rent || "Contact for price",
-        bedrooms: manualData.bedrooms || "Contact for details",
-        bathrooms: manualData.bathrooms || "Contact for details",
-        area: manualData.area || "Contact for details",
+        monthly_rent: manualData.monthly_rent || "",
+        bedrooms: manualData.bedrooms || "",
+        bathrooms: manualData.bathrooms || "",
+        area: manualData.area || "",
         zillow_url: manualData.zillow_url || "",
         images: imageUrls,
         description: manualData.description || undefined
@@ -85,6 +125,18 @@ export default function AddPropertyPage() {
       // Assign to managers if any selected
       if (selectedManagerIds.length > 0 && savedProperty.id) {
         await assignPropertyToManagers(savedProperty.id, selectedManagerIds)
+      }
+
+      // Auto-generate AI description if no description was provided
+      if (!manualData.description && savedProperty.id) {
+        console.log('Generating AI description...')
+        await generateAIDescription(savedProperty.id, {
+          address: manualData.address,
+          monthly_rent: manualData.monthly_rent,
+          bedrooms: manualData.bedrooms,
+          bathrooms: manualData.bathrooms,
+          area: manualData.area,
+        })
       }
 
       setSuccess(true)
@@ -174,24 +226,24 @@ export default function AddPropertyPage() {
                   propertyData.monthlyRent ||
                   propertyData.rentPrice ||
                   propertyData.rentZestimate ||
-                  "Contact for price"
+                  ""
 
       // Extract property details - some listings might not have these
       const bedrooms = propertyData.bedrooms ||
                       propertyData.beds ||
                       (propertyData.resoFacts && propertyData.resoFacts.bedrooms) ||
-                      "Contact for details"
+                      ""
 
       const bathrooms = propertyData.bathrooms ||
                        propertyData.baths ||
                        (propertyData.resoFacts && propertyData.resoFacts.bathrooms) ||
-                       "Contact for details"
+                       ""
 
       const area = propertyData.livingArea ||
                   propertyData.area ||
                   propertyData.lotSize ||
                   (propertyData.resoFacts && propertyData.resoFacts.livingArea) ||
-                  "Contact for details"
+                  ""
 
       // Get image URLs from Zillow
       const zillowImageUrls = propertyData.photos || propertyData.images || []
@@ -246,6 +298,18 @@ export default function AddPropertyPage() {
       // Assign to managers if any selected
       if (selectedManagerIds.length > 0 && savedProperty.id) {
         await assignPropertyToManagers(savedProperty.id, selectedManagerIds)
+      }
+
+      // Always generate AI description for scraped properties (replaces Zillow description)
+      if (savedProperty.id) {
+        console.log('Generating AI description for scraped property...')
+        await generateAIDescription(savedProperty.id, {
+          address: newProperty.address,
+          monthly_rent: newProperty.monthly_rent,
+          bedrooms: newProperty.bedrooms,
+          bathrooms: newProperty.bathrooms,
+          area: newProperty.area,
+        })
       }
 
       setSuccess(true)
@@ -505,9 +569,11 @@ export default function AddPropertyPage() {
                 <div className="flex items-center gap-4 text-white">
                   <div className="skeleton h-6 w-6 rounded-full"></div>
                   <span className="text-base tracking-wide font-semibold">
-                    {inputMode === "scrape"
-                      ? "Processing property data from Zillow..."
-                      : "Saving property..."}
+                    {isGeneratingDescription
+                      ? "Generating AI description..."
+                      : inputMode === "scrape"
+                        ? "Processing property data from Zillow..."
+                        : "Saving property..."}
                   </span>
                 </div>
               ) : (

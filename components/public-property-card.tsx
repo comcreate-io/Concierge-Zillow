@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Home, MapPin, BedDouble, Bath, Maximize, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
-import { formatCurrency, formatNumber } from '@/lib/utils'
+import { formatCurrency, formatNumber, formatPropertyValue, isValidPropertyValue } from '@/lib/utils'
 import { useState } from 'react'
 
 type Property = {
@@ -115,18 +115,18 @@ export function PublicPropertyCard({ property }: { property: Property }) {
         <div className="grid grid-cols-3 gap-3 sm:gap-4">
           <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
             <BedDouble className="h-6 w-6 mx-auto mb-2 text-white" />
-            <p className="text-2xl font-bold text-white">{property.bedrooms || '0'}</p>
+            <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bedrooms)}</p>
             <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">Beds</p>
           </div>
           <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
             <Bath className="h-6 w-6 mx-auto mb-2 text-white" />
-            <p className="text-2xl font-bold text-white">{property.bathrooms || '0'}</p>
+            <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bathrooms)}</p>
             <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">Baths</p>
           </div>
           <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
             <Maximize className="h-6 w-6 mx-auto mb-2 text-white" />
             <p className="text-2xl font-bold text-white">
-              {property.area ? formatNumber(property.area) : '0'}
+              {formatPropertyValue(property.area, formatNumber)}
             </p>
             <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">Sq Ft</p>
           </div>

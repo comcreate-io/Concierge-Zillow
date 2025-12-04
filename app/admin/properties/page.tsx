@@ -10,7 +10,7 @@ import { getProperties, Property as SupabaseProperty } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import { PropertyManager } from "@/components/property-manager-select"
-import { formatCurrency, formatNumber } from "@/lib/utils"
+import { formatCurrency, formatNumber, formatPropertyValue } from "@/lib/utils"
 import { deleteProperty, updatePropertyOrder } from "@/lib/actions/properties"
 
 interface Property {
@@ -155,15 +155,15 @@ function PropertyCard({
           <div className="flex items-center gap-3 mt-1.5 text-[10px] text-white/70">
             <span className="flex items-center gap-0.5">
               <BedDouble className="h-3 w-3" />
-              {property.bedrooms}
+              {formatPropertyValue(property.bedrooms)}
             </span>
             <span className="flex items-center gap-0.5">
               <Bath className="h-3 w-3" />
-              {property.bathrooms}
+              {formatPropertyValue(property.bathrooms)}
             </span>
             <span className="flex items-center gap-0.5">
               <Maximize className="h-3 w-3" />
-              {formatNumber(property.area)}
+              {formatPropertyValue(property.area, formatNumber)}
             </span>
           </div>
 
@@ -246,17 +246,17 @@ function PropertyCard({
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="text-center p-3 glass-card-accent rounded-xl">
               <BedDouble className="h-4 w-4 mx-auto mb-1 text-white" />
-              <div className="text-xl font-bold text-white">{property.bedrooms || '0'}</div>
+              <div className="text-xl font-bold text-white">{formatPropertyValue(property.bedrooms)}</div>
               <div className="text-[10px] text-white/70 uppercase tracking-widest">Beds</div>
             </div>
             <div className="text-center p-3 glass-card-accent rounded-xl">
               <Bath className="h-4 w-4 mx-auto mb-1 text-white" />
-              <div className="text-xl font-bold text-white">{property.bathrooms || '0'}</div>
+              <div className="text-xl font-bold text-white">{formatPropertyValue(property.bathrooms)}</div>
               <div className="text-[10px] text-white/70 uppercase tracking-widest">Baths</div>
             </div>
             <div className="text-center p-3 glass-card-accent rounded-xl">
               <Maximize className="h-4 w-4 mx-auto mb-1 text-white" />
-              <div className="text-xl font-bold text-white">{formatNumber(property.area)}</div>
+              <div className="text-xl font-bold text-white">{formatPropertyValue(property.area, formatNumber)}</div>
               <div className="text-[10px] text-white/70 uppercase tracking-widest">Sq Ft</div>
             </div>
           </div>

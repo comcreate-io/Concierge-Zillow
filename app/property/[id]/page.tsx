@@ -19,8 +19,9 @@ import {
 } from "lucide-react"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
+import ReactMarkdown from "react-markdown"
 import { getPropertyById, Property as SupabaseProperty } from "@/lib/supabase"
-import { formatCurrency, formatNumber } from "@/lib/utils"
+import { formatCurrency, formatNumber, formatPropertyValue, isValidPropertyValue } from "@/lib/utils"
 import { PropertyContactForm } from "@/components/property-contact-form"
 
 interface PropertyManager {
@@ -249,7 +250,7 @@ export default function PropertyListingPage() {
                     <Bed className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{property.bedrooms}</div>
+                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bedrooms)}</div>
                     <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Bedrooms</div>
                   </div>
                 </div>
@@ -260,7 +261,7 @@ export default function PropertyListingPage() {
                     <Bath className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{property.bathrooms}</div>
+                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bathrooms)}</div>
                     <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Bathrooms</div>
                   </div>
                 </div>
@@ -271,7 +272,7 @@ export default function PropertyListingPage() {
                     <Square className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
                   </div>
                   <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatNumber(property.area)}</div>
+                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.area, formatNumber)}</div>
                     <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Square Feet</div>
                   </div>
                 </div>
@@ -359,9 +360,11 @@ export default function PropertyListingPage() {
                   <div className="h-1 w-12 divider-accent"></div>
                   <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">About This Property</h2>
                 </div>
-                <p className="text-white/90 text-base sm:text-lg leading-relaxed">
-                  {property.description}
-                </p>
+                <div className="prose-property text-base sm:text-lg">
+                  <ReactMarkdown>
+                    {property.description}
+                  </ReactMarkdown>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -386,15 +389,15 @@ export default function PropertyListingPage() {
                 </div>
                 <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
                   <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Bedrooms</span>
-                  <span className="font-bold text-white text-lg">{property.bedrooms}</span>
+                  <span className="font-bold text-white text-lg">{formatPropertyValue(property.bedrooms)}</span>
                 </div>
                 <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
                   <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Bathrooms</span>
-                  <span className="font-bold text-white text-lg">{property.bathrooms}</span>
+                  <span className="font-bold text-white text-lg">{formatPropertyValue(property.bathrooms)}</span>
                 </div>
                 <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300 sm:col-span-2">
                   <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Area</span>
-                  <span className="font-bold text-white text-lg">{formatNumber(property.area)} sq ft</span>
+                  <span className="font-bold text-white text-lg">{isValidPropertyValue(property.area) ? `${formatNumber(property.area)} sq ft` : '—'}</span>
                 </div>
               </div>
             </CardContent>
