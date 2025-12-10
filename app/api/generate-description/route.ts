@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Property ID is required' }, { status: 400 })
     }
 
-    const openaiKey = process.env.OPEN_AI_API_KEY
+    const openaiKey = process.env.OPENAI_API || process.env.OPEN_AI_API_KEY
     if (!openaiKey) {
       return NextResponse.json({ error: 'OpenAI API key not configured' }, { status: 500 })
     }

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { createPortal } from 'react-dom'
 import {
   Card,
   CardContent,
@@ -19,9 +20,12 @@ import {
   assignPropertyToClient,
   removePropertyFromClient,
   updateClientPropertyPricing,
+  updateClientPropertyOrder,
+  bulkAssignPropertiesToClient,
+  bulkRemovePropertiesFromClient,
   ClientPricingOptions,
 } from '@/lib/actions/clients'
-import { Search, Home, Plus, X, Loader2, Settings, Check } from 'lucide-react'
+import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square } from 'lucide-react'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 
 type Property = {
@@ -31,6 +35,7 @@ type Property = {
   bathrooms?: number
   area?: number
   images?: string[]
+  position?: number | null
   // Pricing options (from property)
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
@@ -48,7 +53,7 @@ export function ClientPropertyAssignment({
   clientId,
   clientName,
   managerProperties,
-  assignedProperties,
+  assignedProperties: initialAssignedProperties,
 }: {
   clientId: string
   clientName: string
@@ -66,6 +71,25 @@ export function ClientPropertyAssignment({
     show_nightly_rate_to_client: true,
     show_purchase_price_to_client: true,
   })
+  const [isMounted, setIsMounted] = useState(false)
+
+  // Drag and drop state
+  const [assignedProperties, setAssignedProperties] = useState<Property[]>(initialAssignedProperties)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+  const [dragDirection, setDragDirection] = useState<'up' | 'down' | null>(null)
+  const [isSavingOrder, setIsSavingOrder] = useState(false)
+  const dragTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const scrollIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Bulk selection state
+  const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set())
+  const [isBulkMode, setIsBulkMode] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+    setAssignedProperties(initialAssignedProperties)
+  }, [initialAssignedProperties])
 
   const assignedIds = new Set(assignedProperties.map((p) => p.id))
   const availableProperties = managerProperties.filter((p) => !assignedIds.has(p.id))
@@ -74,8 +98,232 @@ export function ClientPropertyAssignment({
     p.address?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Drag and drop handlers
+  const handleDragStart = (index: number) => {
+    setDragIndex(index)
+    setDragDirection(null)
+  }
+
+  const handleDragOver = (index: number) => {
+    if (dragIndex === null || dragIndex === index) return
+
+    const direction = index > dragIndex ? 'down' : 'up'
+    setDragDirection(direction)
+    setDragOverIndex(index)
+
+    if (dragTimeoutRef.current) {
+      clearTimeout(dragTimeoutRef.current)
+    }
+
+    dragTimeoutRef.current = setTimeout(() => {
+      setAssignedProperties(prev => {
+        const newProperties = [...prev]
+        const draggedItem = newProperties[dragIndex]
+        newProperties.splice(dragIndex, 1)
+        newProperties.splice(index, 0, draggedItem)
+        return newProperties
+      })
+      setDragIndex(index)
+    }, 50)
+  }
+
+  const handleDragEnd = async () => {
+    stopAutoScroll()
+    setDragIndex(null)
+    setDragOverIndex(null)
+    setDragDirection(null)
+
+    // Save the new order
+    setIsSavingOrder(true)
+    const propertyIds = assignedProperties.map(p => p.id)
+    const result = await updateClientPropertyOrder(clientId, propertyIds)
+    setIsSavingOrder(false)
+
+    if (result.error) {
+      toast({ title: 'Error', description: result.error, variant: 'destructive' })
+      router.refresh() // Revert to server state
+    } else {
+      toast({ title: 'Success', description: 'Property order updated' })
+    }
+  }
+
+  const handleDrag = (e: React.DragEvent) => {
+    if (e.clientY === 0) return
+
+    const scrollThreshold = 120
+    const scrollSpeed = 20
+    const viewportHeight = window.innerHeight
+    const mouseY = e.clientY
+
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current)
+      scrollIntervalRef.current = null
+    }
+
+    if (mouseY > viewportHeight - scrollThreshold) {
+      const intensity = Math.min((mouseY - (viewportHeight - scrollThreshold)) / scrollThreshold, 1)
+      scrollIntervalRef.current = setInterval(() => {
+        window.scrollBy({ top: scrollSpeed * intensity, behavior: 'auto' })
+      }, 16)
+    } else if (mouseY < scrollThreshold && mouseY > 0) {
+      const intensity = Math.min((scrollThreshold - mouseY) / scrollThreshold, 1)
+      scrollIntervalRef.current = setInterval(() => {
+        window.scrollBy({ top: -(scrollSpeed * intensity), behavior: 'auto' })
+      }, 16)
+    }
+  }
+
+  const stopAutoScroll = () => {
+    if (scrollIntervalRef.current) {
+      clearInterval(scrollIntervalRef.current)
+      scrollIntervalRef.current = null
+    }
+  }
+
+  // Mobile move handlers
+  const handleMoveUp = async (index: number) => {
+    if (index === 0) return
+
+    setAssignedProperties(prev => {
+      const newProperties = [...prev]
+      const item = newProperties[index]
+      newProperties.splice(index, 1)
+      newProperties.splice(index - 1, 0, item)
+      return newProperties
+    })
+
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
+
+    setTimeout(async () => {
+      setIsSavingOrder(true)
+      const propertyIds = assignedProperties.map(p => p.id)
+      await updateClientPropertyOrder(clientId, propertyIds)
+      setIsSavingOrder(false)
+    }, 500)
+  }
+
+  const handleMoveDown = async (index: number) => {
+    if (index === assignedProperties.length - 1) return
+
+    setAssignedProperties(prev => {
+      const newProperties = [...prev]
+      const item = newProperties[index]
+      newProperties.splice(index, 1)
+      newProperties.splice(index + 1, 0, item)
+      return newProperties
+    })
+
+    if (navigator.vibrate) {
+      navigator.vibrate(30)
+    }
+
+    setTimeout(async () => {
+      setIsSavingOrder(true)
+      const propertyIds = assignedProperties.map(p => p.id)
+      await updateClientPropertyOrder(clientId, propertyIds)
+      setIsSavingOrder(false)
+    }, 500)
+  }
+
+  // Bulk selection handlers
+  const toggleBulkMode = () => {
+    setIsBulkMode(!isBulkMode)
+    setSelectedProperties(new Set())
+  }
+
+  const togglePropertySelection = (propertyId: string) => {
+    const newSelected = new Set(selectedProperties)
+    if (newSelected.has(propertyId)) {
+      newSelected.delete(propertyId)
+    } else {
+      newSelected.add(propertyId)
+    }
+    setSelectedProperties(newSelected)
+  }
+
+  const selectAll = () => {
+    setSelectedProperties(new Set(filteredAvailable.map(p => p.id)))
+  }
+
+  const deselectAll = () => {
+    setSelectedProperties(new Set())
+  }
+
+  const handleBulkAdd = async () => {
+    if (selectedProperties.size === 0) return
+
+    // In bulk mode, automatically enable ALL pricing options
+    const allPricingEnabled: ClientPricingOptions = {
+      show_monthly_rent_to_client: true,
+      show_nightly_rate_to_client: true,
+      show_purchase_price_to_client: true,
+    }
+
+    setIsAssigning('bulk')
+    const propertyIds = Array.from(selectedProperties)
+    const result = await bulkAssignPropertiesToClient(clientId, propertyIds, allPricingEnabled)
+
+    if (result.error) {
+      toast({ title: 'Error', description: result.error, variant: 'destructive' })
+    } else {
+      toast({
+        title: 'Success',
+        description: `${result.count} properties assigned to client with all pricing options enabled`
+      })
+      setSelectedProperties(new Set())
+      setIsBulkMode(false)
+      router.refresh()
+    }
+
+    setIsAssigning(null)
+  }
+
+  const handleConfirmBulkAdd = async () => {
+    if (selectedProperties.size === 0) return
+
+    setIsAssigning('bulk')
+    const propertyIds = Array.from(selectedProperties)
+    const result = await bulkAssignPropertiesToClient(clientId, propertyIds, pendingPricing)
+
+    if (result.error) {
+      toast({ title: 'Error', description: result.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Success', description: `${result.count} properties assigned to client` })
+      setSelectedProperties(new Set())
+      setIsBulkMode(false)
+      router.refresh()
+    }
+
+    setIsAssigning(null)
+    setShowPricingModal(null)
+  }
+
+  const handleBulkRemove = async () => {
+    if (selectedProperties.size === 0) return
+
+    const confirmed = confirm(`Remove ${selectedProperties.size} properties from ${clientName}?`)
+    if (!confirmed) return
+
+    setIsAssigning('bulk-remove')
+    const propertyIds = Array.from(selectedProperties)
+    const result = await bulkRemovePropertiesFromClient(clientId, propertyIds)
+
+    if (result.error) {
+      toast({ title: 'Error', description: result.error, variant: 'destructive' })
+    } else {
+      toast({ title: 'Success', description: `${result.count} properties removed from client` })
+      setSelectedProperties(new Set())
+      setIsBulkMode(false)
+      router.refresh()
+    }
+
+    setIsAssigning(null)
+  }
+
+  // Single property handlers (existing functionality)
   const handleStartAssign = (property: Property) => {
-    // Initialize pricing options based on what the property has enabled
     setPendingPricing({
       show_monthly_rent_to_client: !!(property.show_monthly_rent && property.custom_monthly_rent),
       show_nightly_rate_to_client: !!(property.show_nightly_rate && property.custom_nightly_rate),
@@ -86,7 +334,7 @@ export function ClientPropertyAssignment({
   }
 
   const handleConfirmAssign = async () => {
-    if (!showPricingModal) return
+    if (!showPricingModal || showPricingModal === 'bulk') return
 
     setIsAssigning(showPricingModal)
     const result = await assignPropertyToClient(clientId, showPricingModal, pendingPricing)
@@ -100,10 +348,9 @@ export function ClientPropertyAssignment({
 
     setIsAssigning(null)
     setShowPricingModal(null)
-    setPropertyForModal(null)
   }
 
-  const handleUnassign = async (propertyId: string) => {
+  const handleRemove = async (propertyId: string) => {
     setIsAssigning(propertyId)
     const result = await removePropertyFromClient(clientId, propertyId)
 
@@ -127,8 +374,8 @@ export function ClientPropertyAssignment({
     setShowPricingModal(property.id)
   }
 
-  const handleUpdatePricing = async () => {
-    if (!showPricingModal) return
+  const handleSavePricing = async () => {
+    if (!showPricingModal || showPricingModal === 'bulk') return
 
     setIsAssigning(showPricingModal)
     const result = await updateClientPropertyPricing(clientId, showPricingModal, pendingPricing)
@@ -142,401 +389,423 @@ export function ClientPropertyAssignment({
 
     setIsAssigning(null)
     setShowPricingModal(null)
-    setPropertyForModal(null)
   }
 
-  const isEditingAssigned = showPricingModal && assignedIds.has(showPricingModal)
+  // Pricing modal component
+  const renderPricingModal = () => {
+    if (!isMounted || !showPricingModal) return null
 
-  return (
-    <>
-      {/* Pricing Selection Modal */}
-      {showPricingModal && propertyForModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="elevated-card w-full max-w-md">
-            <CardHeader className="pb-4 border-b border-white/10">
-              <CardTitle className="luxury-heading text-xl tracking-[0.1em] text-white">
-                {isEditingAssigned ? 'Edit Pricing Display' : 'Select Pricing to Show'}
-              </CardTitle>
-              <CardDescription className="text-white/70 text-sm">
-                Choose which pricing options {clientName} will see for this property
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              {/* Property Preview */}
-              <div className="flex gap-3 p-3 bg-white/5 rounded-lg">
-                <div className="w-16 h-12 flex-shrink-0 rounded overflow-hidden bg-white/10">
-                  {propertyForModal.images?.[0] ? (
-                    <img src={propertyForModal.images[0]} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center">
-                      <Home className="h-5 w-5 text-white/30" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-white text-sm font-medium truncate">{propertyForModal.address || 'No address'}</p>
-                  <p className="text-white/50 text-xs">Select pricing to display</p>
-                </div>
-              </div>
+    const isBulkModal = showPricingModal === 'bulk'
+    const isEditMode = !isBulkModal && assignedIds.has(showPricingModal)
 
-              {/* Pricing Options */}
-              <div className="space-y-4">
-                {/* Monthly Rent - show if property has this pricing enabled with a value */}
-                {propertyForModal.show_monthly_rent && propertyForModal.custom_monthly_rent ? (
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/20">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        id="modal_monthly_rent"
-                        checked={pendingPricing.show_monthly_rent_to_client}
-                        onCheckedChange={(checked) =>
-                          setPendingPricing(prev => ({ ...prev, show_monthly_rent_to_client: !!checked }))
-                        }
-                        className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:border-white"
-                      />
-                      <Label htmlFor="modal_monthly_rent" className="text-white cursor-pointer">
-                        Monthly Rent
-                      </Label>
-                    </div>
-                    <Badge className="bg-white/10 text-white border-white/30">
-                      {formatCurrency(propertyForModal.custom_monthly_rent)}/mo
-                    </Badge>
-                  </div>
-                ) : null}
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="bg-zinc-900 border border-white/20 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+          <h3 className="text-lg font-semibold text-white mb-4">
+            {isBulkModal
+              ? `Assign ${selectedProperties.size} Properties`
+              : isEditMode
+              ? 'Edit Pricing Visibility'
+              : 'Set Pricing Visibility'}
+          </h3>
+          <p className="text-sm text-white/60 mb-6">
+            {isBulkModal
+              ? `Choose which pricing options to show ${clientName} for these properties:`
+              : `Choose which pricing options to show ${clientName} for this property:`}
+          </p>
 
-                {/* Nightly Rate - show if property has this pricing enabled with a value */}
-                {propertyForModal.show_nightly_rate && propertyForModal.custom_nightly_rate ? (
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/20">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        id="modal_nightly_rate"
-                        checked={pendingPricing.show_nightly_rate_to_client}
-                        onCheckedChange={(checked) =>
-                          setPendingPricing(prev => ({ ...prev, show_nightly_rate_to_client: !!checked }))
-                        }
-                        className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:border-white"
-                      />
-                      <Label htmlFor="modal_nightly_rate" className="text-white cursor-pointer">
-                        Nightly Rate
-                      </Label>
-                    </div>
-                    <Badge className="bg-white/10 text-white border-white/30">
-                      {formatCurrency(propertyForModal.custom_nightly_rate)}/night
-                    </Badge>
-                  </div>
-                ) : null}
-
-                {/* Purchase Price - show if property has this pricing enabled with a value */}
-                {propertyForModal.show_purchase_price && propertyForModal.custom_purchase_price ? (
-                  <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/20">
-                    <div className="flex items-center gap-3">
-                      <Checkbox
-                        id="modal_purchase_price"
-                        checked={pendingPricing.show_purchase_price_to_client}
-                        onCheckedChange={(checked) =>
-                          setPendingPricing(prev => ({ ...prev, show_purchase_price_to_client: !!checked }))
-                        }
-                        className="border-white/40 data-[state=checked]:bg-white data-[state=checked]:border-white"
-                      />
-                      <Label htmlFor="modal_purchase_price" className="text-white cursor-pointer">
-                        Purchase Price
-                      </Label>
-                    </div>
-                    <Badge className="bg-white/10 text-white border-white/30">
-                      {formatCurrency(propertyForModal.custom_purchase_price)}
-                    </Badge>
-                  </div>
-                ) : null}
-
-                {/* No pricing available message - show when property has no pricing configured */}
-                {!(propertyForModal.show_monthly_rent && propertyForModal.custom_monthly_rent) &&
-                 !(propertyForModal.show_nightly_rate && propertyForModal.custom_nightly_rate) &&
-                 !(propertyForModal.show_purchase_price && propertyForModal.custom_purchase_price) && (
-                  <div className="text-center py-4 bg-white/5 rounded-lg">
-                    <p className="text-white/70 text-sm">This property has no pricing configured yet</p>
-                    <p className="text-white/50 text-xs mt-1">You can still add it to the portfolio. Edit the property later to add pricing options.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-3 pt-2">
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setShowPricingModal(null)
-                    setPropertyForModal(null)
-                  }}
-                  className="flex-1 border border-white/20 text-white hover:bg-white/10"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={isEditingAssigned ? handleUpdatePricing : handleConfirmAssign}
-                  disabled={isAssigning === showPricingModal}
-                  className="flex-1 bg-white text-black hover:bg-white/90"
-                >
-                  {isAssigning === showPricingModal ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Check className="h-4 w-4 mr-2" />
-                  )}
-                  {isEditingAssigned ? 'Save Changes' : 'Add Property'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Assigned Properties */}
-        <Card className="elevated-card">
-          <CardHeader className="pb-6 border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="luxury-heading text-2xl tracking-[0.15em] text-white">
-                  {clientName}'s Properties
-                </CardTitle>
-                <CardDescription className="mt-2 text-white/70 tracking-wide">
-                  {assignedProperties.length} {assignedProperties.length === 1 ? 'property' : 'properties'} curated
-                </CardDescription>
-              </div>
-              <Badge className="bg-white/10 text-white border-white/30 px-4 py-2 text-lg">
-                {assignedProperties.length}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {assignedProperties.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="p-6 bg-white/5 rounded-2xl w-fit mx-auto mb-4">
-                  <Home className="h-16 w-16 text-white/30" />
-                </div>
-                <p className="text-white/60 tracking-wide text-lg">No properties assigned yet</p>
-                <p className="text-white/40 text-sm mt-2">Add properties from your portfolio</p>
-              </div>
-            ) : (
-              <div className="space-y-4 max-h-[700px] overflow-y-auto">
-                {assignedProperties.map((property) => (
-                  <AssignedPropertyCard
-                    key={property.id}
-                    property={property}
-                    onRemove={() => handleUnassign(property.id)}
-                    onEditPricing={() => handleEditPricing(property)}
-                    isRemoving={isAssigning === property.id}
-                  />
-                ))}
+          <div className="space-y-4">
+            {propertyForModal?.show_monthly_rent && propertyForModal?.custom_monthly_rent && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show_monthly_rent"
+                  checked={pendingPricing.show_monthly_rent_to_client}
+                  onCheckedChange={(checked) =>
+                    setPendingPricing((prev) => ({
+                      ...prev,
+                      show_monthly_rent_to_client: !!checked,
+                    }))
+                  }
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
+                />
+                <Label htmlFor="show_monthly_rent" className="text-white cursor-pointer">
+                  Monthly Rent ({formatCurrency(propertyForModal.custom_monthly_rent)})
+                </Label>
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        {/* Available Properties */}
-        <Card className="elevated-card">
-          <CardHeader className="pb-6 border-b border-white/10">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <CardTitle className="luxury-heading text-2xl tracking-[0.15em] text-white">
-                  Available Properties
-                </CardTitle>
-                <CardDescription className="mt-2 text-white/70 tracking-wide">
-                  Add properties to client's portfolio
-                </CardDescription>
+            {propertyForModal?.show_nightly_rate && propertyForModal?.custom_nightly_rate && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show_nightly_rate"
+                  checked={pendingPricing.show_nightly_rate_to_client}
+                  onCheckedChange={(checked) =>
+                    setPendingPricing((prev) => ({
+                      ...prev,
+                      show_nightly_rate_to_client: !!checked,
+                    }))
+                  }
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
+                />
+                <Label htmlFor="show_nightly_rate" className="text-white cursor-pointer">
+                  Nightly Rate ({formatCurrency(propertyForModal.custom_nightly_rate)})
+                </Label>
               </div>
-              <Badge className="bg-white/10 text-white border-white/30 px-4 py-2 text-lg">
-                {availableProperties.length}
+            )}
+
+            {propertyForModal?.show_purchase_price && propertyForModal?.custom_purchase_price && (
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="show_purchase_price"
+                  checked={pendingPricing.show_purchase_price_to_client}
+                  onCheckedChange={(checked) =>
+                    setPendingPricing((prev) => ({
+                      ...prev,
+                      show_purchase_price_to_client: !!checked,
+                    }))
+                  }
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black"
+                />
+                <Label htmlFor="show_purchase_price" className="text-white cursor-pointer">
+                  Purchase Price ({formatCurrency(propertyForModal.custom_purchase_price)})
+                </Label>
+              </div>
+            )}
+
+            {isBulkModal && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded p-3 text-sm text-blue-400">
+                These pricing settings will apply to all {selectedProperties.size} selected properties
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 mt-6">
+            <Button
+              variant="ghost"
+              onClick={() => setShowPricingModal(null)}
+              className="text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={isBulkModal ? handleConfirmBulkAdd : isEditMode ? handleSavePricing : handleConfirmAssign}
+              disabled={!!isAssigning}
+              className="bg-white text-black hover:bg-white/90"
+            >
+              {isAssigning ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                isBulkModal ? 'Assign Properties' : isEditMode ? 'Save Changes' : 'Assign Property'
+              )}
+            </Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* Assigned Properties Section */}
+      <Card className="glass-card border-white/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">{clientName}'s Properties</CardTitle>
+              <CardDescription className="text-white/70">
+                {assignedProperties.length} {assignedProperties.length === 1 ? 'property' : 'properties'} assigned
+              </CardDescription>
+            </div>
+            {isSavingOrder && (
+              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                Saving...
               </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {assignedProperties.length === 0 ? (
+            <div className="text-center py-12">
+              <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
+              <p className="text-white/60">No properties assigned yet</p>
+              <p className="text-sm text-white/40 mt-1">Add properties from the available list</p>
             </div>
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-white/50" />
-              <Input
-                placeholder="Search properties by address..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 h-12 bg-white/5 border-white/30 focus:border-white text-white placeholder:text-white/40"
-              />
-            </div>
-          </CardHeader>
-          <CardContent className="pt-6">
-            {filteredAvailable.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="p-6 bg-white/5 rounded-2xl w-fit mx-auto mb-4">
-                  {searchQuery ? <Search className="h-16 w-16 text-white/30" /> : <Home className="h-16 w-16 text-white/30" />}
+          ) : (
+            assignedProperties.map((property, index) => {
+              const isDragging = dragIndex === index
+              const isDragOver = dragOverIndex === index
+              const firstImage = property.images && property.images.length > 0 ? property.images[0] : null
+
+              return (
+                <div
+                  key={property.id}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = 'move'
+                    handleDragStart(index)
+                  }}
+                  onDragOver={(e) => {
+                    e.preventDefault()
+                    handleDragOver(index)
+                  }}
+                  onDrag={handleDrag}
+                  onDragEnd={handleDragEnd}
+                  className={`glass-card-accent p-3 rounded-lg transition-all ${
+                    isDragging ? 'opacity-40 scale-95' : ''
+                  } ${
+                    isDragOver
+                      ? dragDirection === 'down'
+                        ? 'border-b-4 border-white'
+                        : 'border-t-4 border-white'
+                      : ''
+                  } cursor-move hover:bg-white/5`}
+                >
+                  <div className="flex items-center gap-3">
+                    {/* Desktop Drag Handle */}
+                    <div className="hidden md:flex items-center justify-center w-8">
+                      <GripVertical className="h-5 w-5 text-white/50" />
+                    </div>
+
+                    {/* Mobile Move Buttons */}
+                    <div className="flex md:hidden flex-col gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                        className="h-6 w-6 p-0 hover:bg-white/10"
+                      >
+                        <ChevronUp className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleMoveDown(index)}
+                        disabled={index === assignedProperties.length - 1}
+                        className="h-6 w-6 p-0 hover:bg-white/10"
+                      >
+                        <ChevronDown className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    {/* Property Image */}
+                    {firstImage && (
+                      <div className="w-16 h-16 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                        <img
+                          src={firstImage}
+                          alt={property.address || 'Property'}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none'
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Property Details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white font-medium truncate">{property.address || 'Unknown Address'}</p>
+                      <div className="flex gap-3 text-xs text-white/60 mt-1">
+                        {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                        {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                        {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleEditPricing(property)}
+                        disabled={!!isAssigning}
+                        className="hover:bg-white/10 text-white"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleRemove(property.id)}
+                        disabled={isAssigning === property.id}
+                        className="hover:bg-red-500/20 text-red-400"
+                      >
+                        {isAssigning === property.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <X className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-white/60 tracking-wide text-lg">
-                  {searchQuery ? 'No properties found' : 'All properties assigned'}
+              )
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Available Properties Section */}
+      <Card className="glass-card border-white/20">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white">Available Properties</CardTitle>
+              <CardDescription className="text-white/70">
+                {availableProperties.length} {availableProperties.length === 1 ? 'property' : 'properties'} available
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              variant={isBulkMode ? 'default' : 'outline'}
+              onClick={toggleBulkMode}
+              className={isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}
+            >
+              {isBulkMode ? (
+                <>
+                  <CheckSquare className="h-4 w-4 mr-2" />
+                  Bulk Mode
+                </>
+              ) : (
+                <>
+                  <Square className="h-4 w-4 mr-2" />
+                  Bulk Select
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <Input
+              placeholder="Search properties..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 bg-white/5 border-white/30 text-white placeholder:text-white/40"
+            />
+          </div>
+
+          {isBulkMode && selectedProperties.size > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={handleBulkAdd}
+                disabled={!!isAssigning}
+                className="bg-green-500 hover:bg-green-600"
+              >
+                {isAssigning === 'bulk' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add {selectedProperties.size} Selected
+                  </>
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={selectAll}
+                className="border-white/30 text-white hover:bg-white/10"
+              >
+                Select All ({filteredAvailable.length})
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={deselectAll}
+                className="border-white/30 text-white hover:bg-white/10"
+              >
+                Deselect All
+              </Button>
+            </div>
+          )}
+
+          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+            {filteredAvailable.length === 0 ? (
+              <div className="text-center py-12">
+                <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
+                <p className="text-white/60">
+                  {searchQuery ? 'No properties match your search' : 'All properties have been assigned'}
                 </p>
               </div>
             ) : (
-              <div className="space-y-4 max-h-[700px] overflow-y-auto">
-                {filteredAvailable.map((property) => (
-                  <AvailablePropertyCard
+              filteredAvailable.map((property) => {
+                const firstImage = property.images && property.images.length > 0 ? property.images[0] : null
+                const isSelected = selectedProperties.has(property.id)
+
+                return (
+                  <div
                     key={property.id}
-                    property={property}
-                    onAdd={() => handleStartAssign(property)}
-                    isAdding={isAssigning === property.id}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-    </>
-  )
-}
+                    onClick={() => isBulkMode && togglePropertySelection(property.id)}
+                    className={`glass-card-accent p-3 rounded-lg transition-all ${
+                      isBulkMode ? 'cursor-pointer hover:bg-white/10' : ''
+                    } ${isSelected ? 'ring-2 ring-blue-500 bg-blue-500/10' : ''}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {/* Bulk Select Checkbox */}
+                      {isBulkMode && (
+                        <div className="flex-shrink-0">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => togglePropertySelection(property.id)}
+                            className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                          />
+                        </div>
+                      )}
 
-function AssignedPropertyCard({
-  property,
-  onRemove,
-  onEditPricing,
-  isRemoving,
-}: {
-  property: Property
-  onRemove: () => void
-  onEditPricing: () => void
-  isRemoving: boolean
-}) {
-  const firstImage = property.images?.[0] || null
+                      {/* Property Image */}
+                      {firstImage && (
+                        <div className="w-16 h-16 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                          <img
+                            src={firstImage}
+                            alt={property.address || 'Property'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
 
-  // Check which prices are visible to this client
-  const showMonthly = property.client_show_monthly_rent !== false && property.show_monthly_rent && property.custom_monthly_rent
-  const showNightly = property.client_show_nightly_rate !== false && property.show_nightly_rate && property.custom_nightly_rate
-  const showPurchase = property.client_show_purchase_price !== false && property.show_purchase_price && property.custom_purchase_price
-  const hasVisiblePricing = showMonthly || showNightly || showPurchase
+                      {/* Property Details */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium truncate">{property.address || 'Unknown Address'}</p>
+                        <div className="flex gap-3 text-xs text-white/60 mt-1">
+                          {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                          {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                          {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                        </div>
+                      </div>
 
-  return (
-    <div className="group glass-card-accent rounded-xl border border-white/20 overflow-hidden hover:border-white/40 transition-all">
-      <div className="flex gap-4 p-4">
-        <div className="relative w-28 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white/5">
-          {firstImage ? (
-            <img src={firstImage} alt={property.address || 'Property'} className="w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Home className="h-8 w-8 text-white/30" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-white text-sm mb-1 truncate">{property.address || 'No address'}</h3>
-
-          {/* Pricing Display - Shows what's visible to client */}
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {showMonthly && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_monthly_rent!)}/mo
-              </Badge>
-            )}
-            {showNightly && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_nightly_rate!)}/night
-              </Badge>
-            )}
-            {showPurchase && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_purchase_price!)}
-              </Badge>
-            )}
-            {!hasVisiblePricing && (
-              <Badge className="bg-white/10 text-white/60 border-white/20 text-xs">
-                No pricing shown
-              </Badge>
+                      {/* Add Button (only in single mode) */}
+                      {!isBulkMode && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleStartAssign(property)}
+                          disabled={!!isAssigning}
+                          className="bg-white text-black hover:bg-white/90 flex-shrink-0"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })
             )}
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onEditPricing}
-              className="h-7 px-2 text-xs text-white/70 hover:text-white hover:bg-white/10"
-            >
-              <Settings className="h-3 w-3 mr-1" />
-              Pricing
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onRemove}
-              disabled={isRemoving}
-              className="h-7 px-2 text-xs text-red-400 hover:text-red-300 hover:bg-red-500/10"
-            >
-              {isRemoving ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3 mr-1" />}
-              Remove
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function AvailablePropertyCard({
-  property,
-  onAdd,
-  isAdding,
-}: {
-  property: Property
-  onAdd: () => void
-  isAdding: boolean
-}) {
-  const firstImage = property.images?.[0] || null
-  const hasPricing = property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price
-
-  return (
-    <div className="group glass-card-accent rounded-xl border border-white/20 overflow-hidden hover:border-white/40 transition-all">
-      <div className="flex gap-4 p-4">
-        <div className="relative w-28 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-white/5">
-          {firstImage ? (
-            <img src={firstImage} alt={property.address || 'Property'} className="w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Home className="h-8 w-8 text-white/30" />
-            </div>
-          )}
-        </div>
-
-        <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-white text-sm mb-1 truncate">{property.address || 'No address'}</h3>
-
-          {/* Pricing Display (from property) */}
-          <div className="flex flex-wrap gap-1.5 mb-2">
-            {property.show_monthly_rent && property.custom_monthly_rent && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_monthly_rent)}/mo
-              </Badge>
-            )}
-            {property.show_nightly_rate && property.custom_nightly_rate && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_nightly_rate)}/night
-              </Badge>
-            )}
-            {property.show_purchase_price && property.custom_purchase_price && (
-              <Badge className="bg-white/10 text-white border-white/30 text-xs">
-                {formatCurrency(property.custom_purchase_price)}
-              </Badge>
-            )}
-            {!hasPricing && (
-              <div className="flex flex-wrap items-center gap-2 text-white/60 text-xs">
-                {property.bedrooms && <span>{property.bedrooms} bed</span>}
-                {property.bathrooms && <span>{property.bathrooms} bath</span>}
-                {property.area && <span>{formatNumber(property.area)} sqft</span>}
-              </div>
-            )}
-          </div>
-
-          <Button
-            size="sm"
-            onClick={onAdd}
-            disabled={isAdding}
-            className="h-7 px-3 text-xs bg-white/10 hover:bg-white/20 text-white border border-white/30"
-          >
-            {isAdding ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Plus className="h-3 w-3 mr-1" />}
-            Add
-          </Button>
-        </div>
-      </div>
+      {renderPricingModal()}
     </div>
   )
 }

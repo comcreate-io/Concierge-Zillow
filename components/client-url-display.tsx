@@ -6,13 +6,15 @@ import { Input } from '@/components/ui/input'
 import { Copy, Check } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
-export function ClientUrlDisplay({ clientId }: { clientId: string }) {
+export function ClientUrlDisplay({ clientId, clientSlug }: { clientId: string; clientSlug?: string | null }) {
   const [copied, setCopied] = useState(false)
   const { toast } = useToast()
 
+  // Prefer slug over UUID if available
+  const identifier = clientSlug || clientId
   const url = typeof window !== 'undefined'
-    ? `${window.location.origin}/client/${clientId}`
-    : `/client/${clientId}`
+    ? `${window.location.origin}/client/${identifier}`
+    : `/client/${identifier}`
 
   const handleCopy = async () => {
     try {

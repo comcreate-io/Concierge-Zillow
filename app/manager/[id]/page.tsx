@@ -11,15 +11,16 @@ import { ManagerContactForm } from '@/components/manager-contact-form'
 export default async function ManagerPublicPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const supabase = await createClient()
 
   // Fetch property manager
   const { data: manager, error: managerError } = await supabase
     .from('property_managers')
     .select('*')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (managerError || !manager) {
@@ -30,7 +31,7 @@ export default async function ManagerPublicPage({
   const { data: assignments, error: assignmentsError } = await supabase
     .from('property_manager_assignments')
     .select('property_id, properties(*)')
-    .eq('manager_id', params.id)
+    .eq('manager_id', id)
 
   const propertyList = (assignments?.map((a: any) => a.properties).filter(Boolean) || []) as any[]
 
@@ -157,12 +158,13 @@ export default async function ManagerPublicPage({
 }
 
 // Generate static params for dynamic routes (optional, for better performance)
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
   const { data: manager } = await supabase
     .from('property_managers')
     .select('name')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   return {

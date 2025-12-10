@@ -7,24 +7,38 @@ import { Logo } from '@/components/logo'
 import { Mail, Phone, Home } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import { ManagerContactForm } from '@/components/manager-contact-form'
+import { trackClientAccess } from '@/lib/actions/clients'
 
 export default async function ClientPublicPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const supabase = await createClient()
 
-  // Fetch client with their manager
-  const { data: client, error: clientError } = await supabase
+  // Check if id is a UUID or a slug
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+
+  // Fetch client with their manager (support both UUID and slug)
+  const query = supabase
     .from('clients')
     .select('*, property_managers(*)')
-    .eq('id', params.id)
-    .single()
+
+  if (isUUID) {
+    query.eq('id', id)
+  } else {
+    query.eq('slug', id)
+  }
+
+  const { data: client, error: clientError } = await query.single()
 
   if (clientError || !client) {
     notFound()
   }
+
+  // Track that the client accessed their page (async, don't await)
+  trackClientAccess(client.id)
 
   const manager = client.property_managers as any
 
@@ -38,7 +52,7 @@ export default async function ClientPublicPage({
       show_purchase_price_to_client,
       properties(*)
     `)
-    .eq('client_id', params.id)
+    .eq('client_id', client.id)
 
   // Merge assignment pricing options with property data
   // Override property's show_* fields based on client-specific settings
@@ -143,7 +157,7 @@ export default async function ClientPublicPage({
             </h2>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {propertyList.map((property) => (
-                <PublicPropertyCard key={property.id} property={property} clientId={params.id} />
+                <PublicPropertyCard key={property.id} property={property} clientId={id} />
               ))}
             </div>
           </div>
@@ -182,12 +196,13 @@ export default async function ClientPublicPage({
   )
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }) {
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const supabase = await createClient()
   const { data: client } = await supabase
     .from('clients')
     .select('name, property_managers(name)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (!client) {

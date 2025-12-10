@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
-import { Plus, Trash2, ExternalLink, Copy, Check, Loader2, Users } from 'lucide-react'
+import { Plus, Trash2, ExternalLink, Copy, Check, Loader2, Users, Edit } from 'lucide-react'
 import { addClient, deleteClient } from '@/lib/actions/clients'
 import type { Client } from '@/lib/actions/clients'
 import Link from 'next/link'
@@ -238,7 +238,8 @@ export function ClientManagement({ managerId, clients }: ClientManagementProps) 
                       size="sm"
                       className="border-white/30 text-white hover:bg-white/10"
                     >
-                      Manage
+                      <Edit className="h-4 w-4 mr-1" />
+                      Edit
                     </Button>
                   </Link>
                   <Button

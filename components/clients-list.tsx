@@ -42,7 +42,9 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  Plus
+  Plus,
+  Edit,
+  Share2
 } from 'lucide-react'
 import Link from 'next/link'
 import { ClientWithDetails, ClientStatus, updateClientStatus, deleteClient, addClient } from '@/lib/actions/clients'
@@ -328,6 +330,12 @@ export function ClientsList({ clients }: Props) {
                             <StatusIcon className="h-3 w-3 mr-1" />
                             {status.label}
                           </Badge>
+                          {client.is_shared && (
+                            <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 border text-xs">
+                              <Share2 className="h-3 w-3 mr-1" />
+                              Shared
+                            </Badge>
+                          )}
                         </div>
                         {client.email && (
                           <p className="text-sm text-white/60 truncate mt-0.5">{client.email}</p>
@@ -335,16 +343,29 @@ export function ClientsList({ clients }: Props) {
                         <div className="flex items-center gap-4 mt-2 text-xs text-white/50">
                           <span className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            {client.property_managers?.name || 'Unknown Manager'}
+                            {client.is_shared ? (
+                              <>
+                                {client.property_managers?.name || 'Unknown Manager'}
+                                <span className="text-blue-400 ml-1">(shared by {client.shared_by?.name})</span>
+                              </>
+                            ) : (
+                              client.property_managers?.name || 'Unknown Manager'
+                            )}
                           </span>
                           <span className="flex items-center gap-1">
                             <Home className="h-3 w-3" />
                             {client.property_count || 0} {(client.property_count || 0) === 1 ? 'property' : 'properties'}
                           </span>
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1" title="Last updated">
                             <Clock className="h-3 w-3" />
-                            {mounted ? formatDate(client.updated_at) : 'Loading...'}
+                            Updated: {mounted ? formatDate(client.updated_at) : 'Loading...'}
                           </span>
+                          {client.last_accessed && (
+                            <span className="flex items-center gap-1 text-green-400/70" title="Last time client viewed their portfolio">
+                              <Clock className="h-3 w-3" />
+                              Viewed: {mounted ? formatDate(client.last_accessed) : 'Loading...'}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -375,6 +396,19 @@ export function ClientsList({ clients }: Props) {
                         title="Copy Link"
                       >
                         <Copy className="h-4 w-4" />
+                      </Button>
+
+                      {/* Edit Button */}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-white/70 hover:text-white hover:bg-white/10"
+                        asChild
+                        title="Edit"
+                      >
+                        <Link href={`/admin/client/${client.id}`}>
+                          <Edit className="h-4 w-4" />
+                        </Link>
                       </Button>
 
                       {/* Preview Button */}

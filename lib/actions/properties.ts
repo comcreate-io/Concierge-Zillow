@@ -184,3 +184,93 @@ export async function updatePropertyOrder(propertyIds: string[]) {
   revalidatePath('/')
   return { success: true }
 }
+
+// ============ PROPERTY CUSTOMIZATION FUNCTIONS ============
+
+export type PropertyCustomization = {
+  // Field visibility
+  show_bedrooms?: boolean
+  show_bathrooms?: boolean
+  show_area?: boolean
+  show_address?: boolean
+  show_images?: boolean
+  // Custom labels
+  label_bedrooms?: string
+  label_bathrooms?: string
+  label_area?: string
+  label_monthly_rent?: string
+  label_nightly_rate?: string
+  label_purchase_price?: string
+  // Custom notes
+  custom_notes?: string | null
+}
+
+// Update property customization settings
+export async function updatePropertyCustomization(
+  propertyId: string,
+  customization: PropertyCustomization
+) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('properties')
+    .update({
+      ...customization,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', propertyId)
+
+  if (error) {
+    console.error('Error updating property customization:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/admin/properties/${propertyId}/edit`)
+  revalidatePath(`/property/${propertyId}`)
+  revalidatePath('/admin/properties')
+
+  // Revalidate all client pages that might have this property
+  revalidatePath('/client/[id]', 'page')
+
+  return { success: true }
+}
+
+// Reset property customization to defaults
+export async function resetPropertyCustomization(propertyId: string) {
+  const supabase = await createClient()
+
+  const defaults: PropertyCustomization = {
+    show_bedrooms: true,
+    show_bathrooms: true,
+    show_area: true,
+    show_address: true,
+    show_images: true,
+    label_bedrooms: 'Bedrooms',
+    label_bathrooms: 'Bathrooms',
+    label_area: 'Square Feet',
+    label_monthly_rent: 'Monthly Rent',
+    label_nightly_rate: 'Nightly Rate',
+    label_purchase_price: 'Purchase Price',
+    custom_notes: null,
+  }
+
+  const { error } = await supabase
+    .from('properties')
+    .update({
+      ...defaults,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', propertyId)
+
+  if (error) {
+    console.error('Error resetting property customization:', error)
+    return { error: error.message }
+  }
+
+  revalidatePath(`/admin/properties/${propertyId}/edit`)
+  revalidatePath(`/property/${propertyId}`)
+  revalidatePath('/admin/properties')
+  revalidatePath('/client/[id]', 'page')
+
+  return { success: true }
+}

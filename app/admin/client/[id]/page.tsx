@@ -1,25 +1,29 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { ClientPropertyAssignment } from '@/components/client-property-assignment'
+import { ClientEditDialog } from '@/components/client-edit-dialog'
+import { ShareClientDialog } from '@/components/share-client-dialog'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, Copy, User, Mail, Phone } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Copy, User, Mail, Phone, Share2 } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import { ClientUrlDisplay } from '@/components/client-url-display'
 
 export default async function AdminClientPage({
   params,
 }: {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }) {
+  const { id } = await params
   const supabase = await createClient()
 
   // Fetch client with their manager
   const { data: client, error: clientError } = await supabase
     .from('clients')
     .select('*, property_managers(*)')
-    .eq('id', params.id)
+    .eq('id', id)
     .single()
 
   if (clientError || !client) {
@@ -28,13 +32,44 @@ export default async function AdminClientPage({
 
   const manager = client.property_managers as any
 
-  // Fetch ALL properties (so manager can assign any property to their client)
-  const { data: allProperties } = await supabase
-    .from('properties')
-    .select('*')
-    .order('created_at', { ascending: false })
+  // Check if this client is shared with the current user
+  const { data: { user } } = await supabase.auth.getUser()
+  let isSharedWithMe = false
+  let sharedByManager = null
 
-  const managerProperties = allProperties || []
+  if (user) {
+    const { data: currentManager } = await supabase
+      .from('property_managers')
+      .select('id')
+      .eq('auth_user_id', user.id)
+      .single()
+
+    if (currentManager && currentManager.id !== manager.id) {
+      // This client doesn't belong to the current manager, check if it's shared
+      const { data: shareData } = await supabase
+        .from('client_shares')
+        .select(`
+          id,
+          shared_by:property_managers!shared_by_manager_id(id, name, email)
+        `)
+        .eq('client_id', id)
+        .eq('shared_with_manager_id', currentManager.id)
+        .single()
+
+      if (shareData) {
+        isSharedWithMe = true
+        sharedByManager = shareData.shared_by as any
+      }
+    }
+  }
+
+  // Fetch only properties assigned to this manager
+  const { data: managerAssignments } = await supabase
+    .from('property_manager_assignments')
+    .select('property_id, properties(*)')
+    .eq('manager_id', manager.id)
+
+  const managerProperties = (managerAssignments?.map((a: any) => a.properties).filter(Boolean) || []) as any[]
 
   // Fetch properties already assigned to this client (with client-specific pricing visibility)
   const { data: clientAssignments } = await supabase
@@ -46,7 +81,7 @@ export default async function AdminClientPage({
       show_purchase_price_to_client,
       properties(*)
     `)
-    .eq('client_id', params.id)
+    .eq('client_id', id)
 
   // Merge assignment pricing options with property data
   const clientProperties = (clientAssignments?.map((a: any) => ({
@@ -61,10 +96,10 @@ export default async function AdminClientPage({
     <div className="space-y-8 animate-fade-in">
       {/* Header Section */}
       <div>
-        <Link href={`/admin/manager/${manager.id}`}>
+        <Link href="/admin/clients">
           <Button variant="ghost" className="mb-6 text-white hover:text-white-light hover:bg-white/10 -ml-4">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to {manager.name}
+            Back to Clients
           </Button>
         </Link>
 
@@ -80,9 +115,33 @@ export default async function AdminClientPage({
 
               {/* Client Info */}
               <div className="flex-1">
-                <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white mb-4">
-                  {client.name}
-                </h1>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex flex-col gap-3">
+                    <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white">
+                      {client.name}
+                    </h1>
+                    {isSharedWithMe && sharedByManager && (
+                      <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 border w-fit">
+                        <Share2 className="h-3 w-3 mr-1" />
+                        Shared by {sharedByManager.name}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <ShareClientDialog
+                      clientId={id}
+                      clientName={client.name}
+                      currentManagerId={manager.id}
+                    />
+                    <ClientEditDialog
+                      clientId={id}
+                      clientName={client.name}
+                      clientEmail={client.email}
+                      clientPhone={client.phone}
+                      clientSlug={client.slug}
+                    />
+                  </div>
+                </div>
                 <div className="flex flex-col gap-3 text-white/80">
                   {client.email && (
                     <div className="flex items-center gap-3">
@@ -125,8 +184,8 @@ export default async function AdminClientPage({
           </CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-4">
-          <ClientUrlDisplay clientId={params.id} />
-          <Link href={`/client/${params.id}`} target="_blank" className="block">
+          <ClientUrlDisplay clientId={id} clientSlug={client.slug} />
+          <Link href={`/client/${client.slug || id}`} target="_blank" className="block">
             <Button variant="outline" className="w-full sm:w-auto border-white/30 hover:bg-white/10 hover:border-white text-white">
               <ExternalLink className="h-4 w-4 mr-2" />
               Preview Client Portfolio Page
@@ -141,7 +200,7 @@ export default async function AdminClientPage({
           Property Assignment
         </h2>
         <ClientPropertyAssignment
-          clientId={params.id}
+          clientId={id}
           clientName={client.name}
           managerProperties={managerProperties}
           assignedProperties={clientProperties}

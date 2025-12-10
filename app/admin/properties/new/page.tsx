@@ -12,11 +12,13 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { saveProperty } from "@/lib/supabase"
 import { assignPropertyToManagers } from "@/lib/actions/properties"
-import { createClient } from "@/lib/supabase/client"
+import { getCurrentManagerProfile } from "@/lib/actions/clients"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AddPropertyPage() {
   const router = useRouter()
+  const { toast } = useToast()
   const [inputMode, setInputMode] = useState<"scrape" | "manual">("scrape")
   const [url, setUrl] = useState("")
   const [isScraping, setIsScraping] = useState(false)
@@ -46,7 +48,9 @@ export default function AddPropertyPage() {
       })
 
       if (!response.ok) {
-        console.error('Failed to generate AI description')
+        const errorData = await response.json().catch(() => ({}))
+        console.warn('AI description generation failed:', errorData.error || 'Unknown error')
+        console.log('Continuing without AI description - using Zillow description if available')
         return false
       }
 
@@ -54,7 +58,8 @@ export default function AddPropertyPage() {
       console.log('AI description generated:', data.description?.substring(0, 100) + '...')
       return true
     } catch (error) {
-      console.error('Error generating AI description:', error)
+      console.warn('Error generating AI description:', error)
+      console.log('Continuing without AI description')
       return false
     } finally {
       setIsGeneratingDescription(false)
@@ -84,21 +89,11 @@ export default function AddPropertyPage() {
 
   useEffect(() => {
     async function loadCurrentManager() {
-      const supabase = createClient()
-      // Get the current logged-in user
-      const { data: { user } } = await supabase.auth.getUser()
+      // Use the server action to get the current manager profile
+      const { data: managerProfile } = await getCurrentManagerProfile()
 
-      if (user) {
-        // Find the property manager record linked to this auth user
-        const { data: manager } = await supabase
-          .from('property_managers')
-          .select('id')
-          .eq('auth_user_id', user.id)
-          .single()
-
-        if (manager) {
-          setCurrentManagerId(manager.id)
-        }
+      if (managerProfile) {
+        setCurrentManagerId(managerProfile.id)
       }
     }
     loadCurrentManager()
@@ -106,7 +101,11 @@ export default function AddPropertyPage() {
 
   const handleManualSave = async () => {
     if (!manualData.address.trim()) {
-      alert('Please enter at least the property address')
+      toast({
+        title: "Address Required",
+        description: "Please enter at least the property address",
+        variant: "destructive",
+      })
       return
     }
 
@@ -183,7 +182,11 @@ export default function AddPropertyPage() {
       }, 2000)
     } catch (error) {
       console.error('Error saving property:', error)
-      alert(`Failed to save property: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast({
+        title: "Failed to Save Property",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      })
     } finally {
       setIsScraping(false)
     }
@@ -203,6 +206,9 @@ export default function AddPropertyPage() {
         throw new Error('HasData API key is not configured')
       }
 
+      console.log('Attempting to scrape URL:', url.trim())
+      console.log('Using API key:', apiKey ? `${apiKey.substring(0, 10)}...` : 'NOT SET')
+
       const response = await fetch('https://api.hasdata.com/scrape/zillow/property', {
         method: 'POST',
         headers: {
@@ -216,14 +222,43 @@ export default function AddPropertyPage() {
       })
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        const errorMessage = errorData.message || errorData.error || response.statusText || 'Unknown error occurred'
+        const responseText = await response.text()
+        console.error('Scraping API error response:', responseText)
+
+        let errorData: any = {}
+        try {
+          errorData = JSON.parse(responseText)
+        } catch (e) {
+          // Response is not JSON
+        }
+
+        // Build a helpful error message
+        let errorMessage = 'Unknown error occurred'
+
+        if (response.status === 400) {
+          errorMessage = 'Invalid Zillow URL or property not found. Please check:\n' +
+            '• The URL is a valid Zillow property listing\n' +
+            '• The property is currently active on Zillow\n' +
+            '• You copied the complete URL from your browser'
+        } else if (response.status === 401 || response.status === 403) {
+          errorMessage = 'API authentication failed. Please check your HasData API key.'
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please wait a moment and try again.'
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.error) {
+          errorMessage = errorData.error
+        }
+
         console.error('Scraping API error:', {
           status: response.status,
           statusText: response.statusText,
-          errorData
+          responseText,
+          errorData,
+          url: url.trim()
         })
-        throw new Error(`Failed to scrape property (${response.status}): ${errorMessage}`)
+
+        throw new Error(errorMessage)
       }
 
       const data = await response.json()
@@ -432,7 +467,14 @@ export default function AddPropertyPage() {
         area: typeof area === 'number' ? area.toString() : area,
         zillow_url: url.trim(),
         images: cloudinaryImageUrls,
-        description: propertyData.description || null
+        description: propertyData.description || null,
+        // Pricing options
+        show_monthly_rent: pricingOptions.show_monthly_rent,
+        custom_monthly_rent: pricingOptions.custom_monthly_rent ? Number(pricingOptions.custom_monthly_rent) : null,
+        show_nightly_rate: pricingOptions.show_nightly_rate,
+        custom_nightly_rate: pricingOptions.custom_nightly_rate ? Number(pricingOptions.custom_nightly_rate) : null,
+        show_purchase_price: pricingOptions.show_purchase_price,
+        custom_purchase_price: pricingOptions.custom_purchase_price ? Number(pricingOptions.custom_purchase_price) : null,
       }
 
       console.log('Property to save:', newProperty)
@@ -448,13 +490,18 @@ export default function AddPropertyPage() {
       // Always generate AI description for scraped properties (replaces Zillow description)
       if (savedProperty.id) {
         console.log('Generating AI description for scraped property...')
-        await generateAIDescription(savedProperty.id, {
+        const aiGenerated = await generateAIDescription(savedProperty.id, {
           address: newProperty.address,
           monthly_rent: newProperty.monthly_rent,
           bedrooms: newProperty.bedrooms,
           bathrooms: newProperty.bathrooms,
           area: newProperty.area,
         })
+        if (aiGenerated) {
+          console.log('AI description generated successfully')
+        } else {
+          console.log('AI description generation skipped or failed - property saved with Zillow description')
+        }
       }
 
       setSuccess(true)
@@ -466,7 +513,11 @@ export default function AddPropertyPage() {
       }, 2000)
     } catch (error) {
       console.error('Error scraping property:', error)
-      alert(`Failed to scrape property: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      toast({
+        title: "Failed to Scrape Property",
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: "destructive",
+      })
     } finally {
       setIsScraping(false)
     }
@@ -532,6 +583,7 @@ export default function AddPropertyPage() {
                 size="sm"
                 onClick={() => setInputMode("scrape")}
                 className={inputMode === "scrape" ? "btn-luxury" : "border-white/40 hover:bg-white/10 text-white"}
+                disabled={isScraping}
               >
                 <Link2 className="h-4 w-4 mr-2" />
                 Scrape
@@ -541,6 +593,7 @@ export default function AddPropertyPage() {
                 size="sm"
                 onClick={() => setInputMode("manual")}
                 className={inputMode === "manual" ? "btn-luxury" : "border-white/40 hover:bg-white/10 text-white"}
+                disabled={isScraping}
               >
                 <Edit3 className="h-4 w-4 mr-2" />
                 Manual

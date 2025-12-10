@@ -8,11 +8,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Home, ArrowLeft, Save, Loader2, X, Plus, DollarSign } from "lucide-react"
+import { Home, ArrowLeft, Save, Loader2, X, Plus, DollarSign, Settings } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PropertyManagerSelect, PropertyManager } from "@/components/property-manager-select"
-import { assignPropertyToManagers } from "@/lib/actions/properties"
+import { assignPropertyToManagers, type PropertyCustomization } from "@/lib/actions/properties"
 import { createClient } from "@/lib/supabase/client"
+import { PropertyCustomizationDialog } from "@/components/property-customization-dialog"
 import Link from "next/link"
 
 interface PropertyFormData {
@@ -59,6 +60,10 @@ export default function EditPropertyPage() {
   // Show all images toggle
   const [showAllImages, setShowAllImages] = useState(false)
 
+  // Property customization dialog
+  const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
+  const [customizationSettings, setCustomizationSettings] = useState<PropertyCustomization>({})
+
   useEffect(() => {
     async function loadData() {
       setIsLoading(true)
@@ -95,6 +100,22 @@ export default function EditPropertyPage() {
         custom_nightly_rate: property.custom_nightly_rate?.toString() || "",
         show_purchase_price: property.show_purchase_price || false,
         custom_purchase_price: property.custom_purchase_price?.toString() || ""
+      })
+
+      // Load customization settings
+      setCustomizationSettings({
+        show_bedrooms: property.show_bedrooms ?? true,
+        show_bathrooms: property.show_bathrooms ?? true,
+        show_area: property.show_area ?? true,
+        show_address: property.show_address ?? true,
+        show_images: property.show_images ?? true,
+        label_bedrooms: property.label_bedrooms || 'Bedrooms',
+        label_bathrooms: property.label_bathrooms || 'Bathrooms',
+        label_area: property.label_area || 'Square Feet',
+        label_monthly_rent: property.label_monthly_rent || 'Monthly Rent',
+        label_nightly_rate: property.label_nightly_rate || 'Nightly Rate',
+        label_purchase_price: property.label_purchase_price || 'Purchase Price',
+        custom_notes: property.custom_notes || null,
       })
 
       // Load all property managers
@@ -240,6 +261,14 @@ export default function EditPropertyPage() {
             </p>
           </div>
         </div>
+        <Button
+          type="button"
+          onClick={() => setIsCustomizationOpen(true)}
+          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
+        >
+          <Settings className="h-5 w-5 mr-2" />
+          Customize Display
+        </Button>
       </div>
 
       <div className="h-px divider-accent my-8" />
@@ -587,6 +616,14 @@ export default function EditPropertyPage() {
           </Button>
         </div>
       </form>
+
+      {/* Property Customization Dialog */}
+      <PropertyCustomizationDialog
+        propertyId={propertyId}
+        currentSettings={customizationSettings}
+        isOpen={isCustomizationOpen}
+        onClose={() => setIsCustomizationOpen(false)}
+      />
     </div>
   )
 }

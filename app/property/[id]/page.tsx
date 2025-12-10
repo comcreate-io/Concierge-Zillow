@@ -52,6 +52,21 @@ interface Property {
   custom_nightly_rate?: number | null
   show_purchase_price?: boolean
   custom_purchase_price?: number | null
+  // Field visibility toggles
+  show_bedrooms?: boolean
+  show_bathrooms?: boolean
+  show_area?: boolean
+  show_address?: boolean
+  show_images?: boolean
+  // Custom labels
+  label_bedrooms?: string
+  label_bathrooms?: string
+  label_area?: string
+  label_monthly_rent?: string
+  label_nightly_rate?: string
+  label_purchase_price?: string
+  // Custom notes
+  custom_notes?: string | null
 }
 
 export default function PropertyListingPage() {
@@ -113,6 +128,21 @@ export default function PropertyListingPage() {
           custom_nightly_rate: (data as any).custom_nightly_rate || null,
           show_purchase_price: showPurchasePrice,
           custom_purchase_price: (data as any).custom_purchase_price || null,
+          // Field visibility toggles
+          show_bedrooms: (data as any).show_bedrooms ?? true,
+          show_bathrooms: (data as any).show_bathrooms ?? true,
+          show_area: (data as any).show_area ?? true,
+          show_address: (data as any).show_address ?? true,
+          show_images: (data as any).show_images ?? true,
+          // Custom labels
+          label_bedrooms: (data as any).label_bedrooms || 'Bedrooms',
+          label_bathrooms: (data as any).label_bathrooms || 'Bathrooms',
+          label_area: (data as any).label_area || 'Square Feet',
+          label_monthly_rent: (data as any).label_monthly_rent || 'Monthly Rent',
+          label_nightly_rate: (data as any).label_nightly_rate || 'Nightly Rate',
+          label_purchase_price: (data as any).label_purchase_price || 'Purchase Price',
+          // Custom notes
+          custom_notes: (data as any).custom_notes || null,
         })
       }
       setIsLoading(false)
@@ -259,13 +289,21 @@ export default function PropertyListingPage() {
             <div className="flex flex-col lg:flex-row items-start justify-between gap-6 lg:gap-8 mb-8">
               <div className="flex-1 min-w-0">
                 <Badge className="badge-accent mb-4">Featured Property</Badge>
-                <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white mb-4 break-words tracking-wide">
-                  {property.address}
-                </h1>
-                <div className="flex items-start gap-2 text-white/70 text-base sm:text-lg">
-                  <MapPin className="h-5 w-5 flex-shrink-0 mt-1" />
-                  <span className="break-words">{property.address}</span>
-                </div>
+                {property.show_address !== false ? (
+                  <>
+                    <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white mb-4 break-words tracking-wide">
+                      {property.address}
+                    </h1>
+                    <div className="flex items-start gap-2 text-white/70 text-base sm:text-lg">
+                      <MapPin className="h-5 w-5 flex-shrink-0 mt-1" />
+                      <span className="break-words">{property.address}</span>
+                    </div>
+                  </>
+                ) : (
+                  <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white mb-4 break-words tracking-wide">
+                    Luxury Property
+                  </h1>
+                )}
               </div>
               {/* Pricing Display */}
               {(property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price) && (() => {
@@ -297,7 +335,9 @@ export default function PropertyListingPage() {
                             <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
                               {formatCurrency(property.custom_monthly_rent)}
                             </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>Per Month</div>
+                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
+                              {property.label_monthly_rent || 'Per Month'}
+                            </div>
                           </div>
                         )}
                         {property.show_nightly_rate && property.custom_nightly_rate && (
@@ -305,7 +345,9 @@ export default function PropertyListingPage() {
                             <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
                               {formatCurrency(property.custom_nightly_rate)}
                             </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>Per Night</div>
+                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
+                              {property.label_nightly_rate || 'Per Night'}
+                            </div>
                             <div className="text-[10px] text-white/50 italic">not including taxes</div>
                           </div>
                         )}
@@ -314,7 +356,9 @@ export default function PropertyListingPage() {
                             <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
                               {formatCurrency(property.custom_purchase_price)}
                             </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>Purchase Price</div>
+                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
+                              {property.label_purchase_price || 'Purchase Price'}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -331,47 +375,67 @@ export default function PropertyListingPage() {
               <div className="h-px flex-1 divider-accent"></div>
             </div>
 
-            {/* Property Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-              <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                <div className="flex items-center gap-4 p-5 sm:p-6">
-                  <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                    <Bed className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bedrooms)}</div>
-                    <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Bedrooms</div>
-                  </div>
+            {/* Property Stats - respect visibility settings */}
+            {(() => {
+              const visibleStats = [
+                property.show_bedrooms !== false,
+                property.show_bathrooms !== false,
+                property.show_area !== false
+              ].filter(Boolean).length
+
+              if (visibleStats === 0) return null
+
+              const gridCols = visibleStats === 3 ? 'sm:grid-cols-3' : visibleStats === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1'
+
+              return (
+                <div className={`grid grid-cols-1 ${gridCols} gap-4 sm:gap-6`}>
+                  {property.show_bedrooms !== false && (
+                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                      <div className="flex items-center gap-4 p-5 sm:p-6">
+                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
+                          <Bed className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bedrooms)}</div>
+                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_bedrooms || 'Bedrooms'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {property.show_bathrooms !== false && (
+                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                      <div className="flex items-center gap-4 p-5 sm:p-6">
+                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
+                          <Bath className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bathrooms)}</div>
+                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_bathrooms || 'Bathrooms'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  {property.show_area !== false && (
+                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                      <div className="flex items-center gap-4 p-5 sm:p-6">
+                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
+                          <Square className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.area, formatNumber)}</div>
+                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_area || 'Square Feet'}</div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                <div className="flex items-center gap-4 p-5 sm:p-6">
-                  <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                    <Bath className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bathrooms)}</div>
-                    <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Bathrooms</div>
-                  </div>
-                </div>
-              </div>
-              <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                <div className="flex items-center gap-4 p-5 sm:p-6">
-                  <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                    <Square className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.area, formatNumber)}</div>
-                    <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">Square Feet</div>
-                  </div>
-                </div>
-              </div>
-            </div>
+              )
+            })()}
           </div>
         </div>
 
-        {/* Property Images Gallery */}
-        {property.images.length > 0 && (
+        {/* Property Images Gallery - respect show_images */}
+        {property.show_images !== false && property.images.length > 0 && (
           <div className="mb-8 sm:mb-10">
             <Card className="glass-card-accent elevated-card border border-white/20 overflow-hidden p-0">
               <div className="relative group/gallery">
@@ -459,6 +523,23 @@ export default function PropertyListingPage() {
           </div>
         )}
 
+        {/* Custom Notes from Admin */}
+        {property.custom_notes && (
+          <div className="mb-8 sm:mb-10">
+            <Card className="glass-card-accent elevated-card border border-blue-400/30 bg-blue-500/5">
+              <CardContent className="p-6 sm:p-8 md:p-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-1 w-12 bg-gradient-to-r from-blue-400 to-purple-500"></div>
+                  <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Important Information</h2>
+                </div>
+                <div className="prose-property text-base sm:text-lg text-white/90 whitespace-pre-wrap">
+                  {property.custom_notes}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Property Details */}
         <div className="mb-8 sm:mb-10">
           <Card className="glass-card-accent elevated-card border border-white/20">
@@ -468,32 +549,40 @@ export default function PropertyListingPage() {
                 <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Property Details</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                  <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Address</span>
-                  <span className="font-bold text-white text-right ml-4">{property.address}</span>
-                </div>
-                <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                  <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Bedrooms</span>
-                  <span className="font-bold text-white text-lg">{formatPropertyValue(property.bedrooms)}</span>
-                </div>
-                <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                  <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Bathrooms</span>
-                  <span className="font-bold text-white text-lg">{formatPropertyValue(property.bathrooms)}</span>
-                </div>
-                <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                  <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Area</span>
-                  <span className="font-bold text-white text-lg">{isValidPropertyValue(property.area) ? `${formatNumber(property.area)} sq ft` : '—'}</span>
-                </div>
+                {property.show_address !== false && (
+                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Address</span>
+                    <span className="font-bold text-white text-right ml-4">{property.address}</span>
+                  </div>
+                )}
+                {property.show_bedrooms !== false && (
+                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_bedrooms || 'Bedrooms'}</span>
+                    <span className="font-bold text-white text-lg">{formatPropertyValue(property.bedrooms)}</span>
+                  </div>
+                )}
+                {property.show_bathrooms !== false && (
+                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_bathrooms || 'Bathrooms'}</span>
+                    <span className="font-bold text-white text-lg">{formatPropertyValue(property.bathrooms)}</span>
+                  </div>
+                )}
+                {property.show_area !== false && (
+                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_area || 'Area'}</span>
+                    <span className="font-bold text-white text-lg">{isValidPropertyValue(property.area) ? `${formatNumber(property.area)} sq ft` : '—'}</span>
+                  </div>
+                )}
                 {/* Pricing Details */}
                 {property.show_monthly_rent && property.custom_monthly_rent && (
                   <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Monthly Rent</span>
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_monthly_rent || 'Monthly Rent'}</span>
                     <span className="font-bold text-white text-lg">{formatCurrency(property.custom_monthly_rent)}</span>
                   </div>
                 )}
                 {property.show_nightly_rate && property.custom_nightly_rate && (
                   <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Nightly Rate</span>
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_nightly_rate || 'Nightly Rate'}</span>
                     <div className="text-right">
                       <span className="font-bold text-white text-lg">{formatCurrency(property.custom_nightly_rate)}</span>
                       <div className="text-xs text-white/50 italic">not including taxes</div>
@@ -502,7 +591,7 @@ export default function PropertyListingPage() {
                 )}
                 {property.show_purchase_price && property.custom_purchase_price && (
                   <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Purchase Price</span>
+                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_purchase_price || 'Purchase Price'}</span>
                     <span className="font-bold text-white text-lg">{formatCurrency(property.custom_purchase_price)}</span>
                   </div>
                 )}
