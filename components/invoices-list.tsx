@@ -39,6 +39,7 @@ import {
   CheckCircle,
   AlertCircle,
   Mail,
+  Download,
 } from 'lucide-react'
 import { Invoice, InvoiceStatus, deleteInvoice, sendInvoice } from '@/lib/actions/invoices'
 import { formatCurrency } from '@/lib/utils'
@@ -270,15 +271,31 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                             </>
                           )}
                           {invoice.status !== 'draft' && (
-                            <Link href={`/invoice/${invoice.invoice_number}`} target="_blank">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-white/70 hover:text-white hover:bg-white/10"
+                            <>
+                              <a
+                                href={`/api/invoice/${invoice.invoice_number}/pdf`}
+                                download={`${invoice.invoice_number}.pdf`}
                               >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
-                            </Link>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                                  title="Download PDF"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </a>
+                              <Link href={`/invoice/${invoice.invoice_number}`} target="_blank">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-white/70 hover:text-white hover:bg-white/10"
+                                  title="View Invoice"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              </Link>
+                            </>
                           )}
                         </div>
                       </TableCell>

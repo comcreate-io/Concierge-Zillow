@@ -15,6 +15,7 @@ import {
   AlertCircle,
   CreditCard,
   Building2,
+  Download,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
@@ -108,6 +109,19 @@ export default function InvoiceViewPage() {
                 </div>
               </div>
             </div>
+            <a
+              href={`/api/invoice/${invoice.invoice_number}/pdf`}
+              download={`${invoice.invoice_number}.pdf`}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </a>
           </div>
         </div>
       </header>
