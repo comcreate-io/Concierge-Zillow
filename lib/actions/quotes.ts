@@ -32,6 +32,7 @@ export type Quote = {
   sent_at: string | null
   viewed_at: string | null
   responded_at: string | null
+  converted_to_invoice_id: string | null
 }
 
 export type QuoteWithItems = Quote & {
@@ -770,4 +771,137 @@ ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
     console.error('Failed to send quote email:', error)
     return { error: 'Failed to send email' }
   }
+}
+
+// Convert an accepted quote to an invoice
+export async function convertQuoteToInvoice(quoteId: string) {
+  const supabase = await createClient()
+
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  // Get quote with service items
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('id', quoteId)
+    .single()
+
+  if (quoteError || !quote) {
+    return { error: 'Quote not found' }
+  }
+
+  // Verify quote is accepted and not already converted
+  if (quote.status !== 'accepted') {
+    return { error: 'Only accepted quotes can be converted to invoices' }
+  }
+
+  if (quote.converted_to_invoice_id) {
+    return { error: 'This quote has already been converted to an invoice' }
+  }
+
+  // Get service items
+  const { data: serviceItems, error: itemsError } = await supabase
+    .from('quote_service_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+    .order('created_at', { ascending: true })
+
+  if (itemsError) {
+    return { error: itemsError.message }
+  }
+
+  // Generate invoice number
+  const year = new Date().getFullYear()
+  const prefix = `INV-${year}-`
+
+  const { data: invoices } = await supabase
+    .from('invoices')
+    .select('invoice_number')
+    .like('invoice_number', `${prefix}%`)
+    .order('invoice_number', { ascending: false })
+    .limit(1)
+
+  let nextNumber = 1
+  if (invoices && invoices.length > 0) {
+    const lastNumber = invoices[0].invoice_number
+    const match = lastNumber.match(/INV-\d{4}-(\d+)/)
+    if (match) {
+      nextNumber = parseInt(match[1], 10) + 1
+    }
+  }
+
+  const invoiceNumber = `${prefix}${nextNumber.toString().padStart(3, '0')}`
+
+  // Set due date to 30 days from now
+  const dueDate = new Date()
+  dueDate.setDate(dueDate.getDate() + 30)
+
+  // Create invoice (no tax for quotes conversion - can be adjusted in edit)
+  const { data: invoice, error: invoiceError } = await supabase
+    .from('invoices')
+    .insert({
+      invoice_number: invoiceNumber,
+      manager_id: managerProfile.id,
+      client_name: quote.client_name,
+      client_email: quote.client_email,
+      due_date: dueDate.toISOString().split('T')[0],
+      status: 'draft',
+      subtotal: quote.subtotal,
+      tax_rate: 0,
+      tax_amount: 0,
+      total: quote.total,
+      notes: quote.notes ? `Converted from Quote ${quote.quote_number}\n\n${quote.notes}` : `Converted from Quote ${quote.quote_number}`,
+      source_quote_id: quoteId,
+    })
+    .select()
+    .single()
+
+  if (invoiceError) {
+    return { error: invoiceError.message }
+  }
+
+  // Convert service items to line items (without photos)
+  if (serviceItems && serviceItems.length > 0) {
+    const lineItems = serviceItems.map((item: QuoteServiceItem) => ({
+      invoice_id: invoice.id,
+      description: item.description ? `${item.service_name} - ${item.description}` : item.service_name,
+      quantity: 1,
+      unit_price: item.price,
+      total: item.price,
+    }))
+
+    const { error: lineItemsError } = await supabase
+      .from('invoice_line_items')
+      .insert(lineItems)
+
+    if (lineItemsError) {
+      // Rollback invoice creation
+      await supabase.from('invoices').delete().eq('id', invoice.id)
+      return { error: lineItemsError.message }
+    }
+  }
+
+  // Update quote with link to invoice
+  const { error: updateError } = await supabase
+    .from('quotes')
+    .update({
+      converted_to_invoice_id: invoice.id,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quoteId)
+
+  if (updateError) {
+    // Rollback invoice creation
+    await supabase.from('invoice_line_items').delete().eq('invoice_id', invoice.id)
+    await supabase.from('invoices').delete().eq('id', invoice.id)
+    return { error: updateError.message }
+  }
+
+  revalidatePath('/admin/quotes')
+  revalidatePath('/admin/invoices')
+  return { data: invoice }
 }

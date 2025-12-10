@@ -21,6 +21,8 @@ import {
   Calendar,
   FileText,
   Percent,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react'
 import Link from 'next/link'
 import { createInvoice, updateInvoice, InvoiceWithLineItems } from '@/lib/actions/invoices'
@@ -183,6 +185,28 @@ export function InvoiceForm({ invoice }: InvoiceFormProps) {
           </div>
         </div>
       </div>
+
+      {/* Source Quote Link */}
+      {invoice?.source_quote_id && (
+        <Card className="glass-card-accent border-purple-500/30 bg-purple-500/10 mt-4">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-5 w-5 text-purple-400" />
+              <span className="text-white">This invoice was created from an accepted quote</span>
+            </div>
+            <Link href={`/admin/quotes`}>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+              >
+                <ExternalLink className="h-4 w-4 mr-2" />
+                View Quotes
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="h-px divider-accent my-8" />
 

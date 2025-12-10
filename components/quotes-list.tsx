@@ -43,8 +43,9 @@ import {
   Plane,
   Download,
   Mail,
+  Receipt,
 } from 'lucide-react'
-import { Quote, QuoteStatus, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF } from '@/lib/actions/quotes'
+import { Quote, QuoteStatus, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
@@ -66,6 +67,8 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   const [isDuplicating, setIsDuplicating] = useState(false)
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [isEmailing, setIsEmailing] = useState(false)
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false)
+  const [isConverting, setIsConverting] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -169,6 +172,34 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
     setIsEmailing(false)
     setEmailDialogOpen(false)
     setSelectedQuote(null)
+  }
+
+  const handleConvert = async () => {
+    if (!selectedQuote) return
+    setIsConverting(true)
+
+    const result = await convertQuoteToInvoice(selectedQuote.id)
+
+    if (result.error) {
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      })
+      setIsConverting(false)
+      setConvertDialogOpen(false)
+      setSelectedQuote(null)
+    } else {
+      toast({
+        title: 'Invoice created',
+        description: `Quote ${selectedQuote.quote_number} has been converted to invoice.`,
+      })
+      setIsConverting(false)
+      setConvertDialogOpen(false)
+      setSelectedQuote(null)
+      // Redirect to edit the new invoice
+      router.push(`/admin/invoices/${result.data?.id}/edit`)
+    }
   }
 
   const formatDate = (dateString: string) => {
@@ -328,6 +359,32 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                           )}
                           {quote.status !== 'draft' && (
                             <>
+                              {quote.status === 'accepted' && !quote.converted_to_invoice_id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedQuote(quote)
+                                    setConvertDialogOpen(true)
+                                  }}
+                                  className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                  title="Convert to Invoice"
+                                >
+                                  <Receipt className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {quote.converted_to_invoice_id && (
+                                <Link href={`/admin/invoices/${quote.converted_to_invoice_id}/edit`}>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                                    title="View Invoice"
+                                  >
+                                    <Receipt className="h-4 w-4" />
+                                  </Button>
+                                </Link>
+                              )}
                               <a
                                 href={`/api/quote/${quote.quote_number}/pdf`}
                                 download={`${quote.quote_number}.pdf`}
@@ -455,6 +512,32 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
               className="bg-purple-500 hover:bg-purple-600 text-white"
             >
               {isEmailing ? 'Sending...' : 'Email PDF'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Convert to Invoice Confirmation Dialog */}
+      <AlertDialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <AlertDialogContent className="glass-card-accent border-white/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Convert to Invoice</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Convert quote {selectedQuote?.quote_number} to an invoice?
+              A new draft invoice will be created with all the quote details pre-filled.
+              You'll be redirected to edit the invoice before sending.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConvert}
+              disabled={isConverting}
+              className="bg-emerald-500 hover:bg-emerald-600 text-white"
+            >
+              {isConverting ? 'Converting...' : 'Convert to Invoice'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

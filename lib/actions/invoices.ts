@@ -34,6 +34,7 @@ export type Invoice = {
   sent_at: string | null
   viewed_at: string | null
   paid_at: string | null
+  source_quote_id: string | null
 }
 
 export type InvoiceWithLineItems = Invoice & {

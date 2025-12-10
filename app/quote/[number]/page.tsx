@@ -336,7 +336,9 @@ export default function QuoteViewPage() {
               <CheckCircle className="h-12 w-12 text-green-400 mx-auto mb-3" />
               <h3 className="text-xl font-semibold text-white mb-2">Quote Accepted</h3>
               <p className="text-white/70">
-                Thank you! We will be in touch shortly to finalize the details.
+                {quote.converted_to_invoice_id
+                  ? 'This quote has been converted to an invoice. You should receive the invoice shortly.'
+                  : 'Thank you! We will be in touch shortly to finalize the details.'}
               </p>
             </CardContent>
           </Card>
