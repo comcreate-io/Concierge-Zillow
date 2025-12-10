@@ -41,8 +41,10 @@ import {
   AlertCircle,
   Copy,
   Plane,
+  Download,
+  Mail,
 } from 'lucide-react'
-import { Quote, QuoteStatus, deleteQuote, sendQuote, duplicateQuote } from '@/lib/actions/quotes'
+import { Quote, QuoteStatus, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
@@ -62,6 +64,8 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false)
+  const [isEmailing, setIsEmailing] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -141,6 +145,30 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
     }
 
     setIsDuplicating(false)
+  }
+
+  const handleEmailPDF = async () => {
+    if (!selectedQuote) return
+    setIsEmailing(true)
+
+    const result = await emailQuotePDF(selectedQuote.id)
+
+    if (result.error) {
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      })
+    } else {
+      toast({
+        title: 'Email sent',
+        description: `Quote PDF has been emailed to ${selectedQuote.client_email}.`,
+      })
+    }
+
+    setIsEmailing(false)
+    setEmailDialogOpen(false)
+    setSelectedQuote(null)
   }
 
   const formatDate = (dateString: string) => {
@@ -300,6 +328,31 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                           )}
                           {quote.status !== 'draft' && (
                             <>
+                              <a
+                                href={`/api/quote/${quote.quote_number}/pdf`}
+                                download={`${quote.quote_number}.pdf`}
+                              >
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                                  title="Download PDF"
+                                >
+                                  <Download className="h-4 w-4" />
+                                </Button>
+                              </a>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedQuote(quote)
+                                  setEmailDialogOpen(true)
+                                }}
+                                className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                                title="Email PDF"
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -377,6 +430,31 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
               className="bg-blue-500 hover:bg-blue-600 text-white"
             >
               {isSending ? 'Sending...' : 'Send Quote'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Email PDF Confirmation Dialog */}
+      <AlertDialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <AlertDialogContent className="glass-card-accent border-white/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Email Quote PDF</AlertDialogTitle>
+            <AlertDialogDescription className="text-white/70">
+              Email the PDF of quote {selectedQuote?.quote_number} to {selectedQuote?.client_email}?
+              The client will receive the quote as a PDF attachment.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEmailPDF}
+              disabled={isEmailing}
+              className="bg-purple-500 hover:bg-purple-600 text-white"
+            >
+              {isEmailing ? 'Sending...' : 'Email PDF'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -561,3 +561,213 @@ export async function declineQuote(quoteNumber: string) {
 
   return { success: true }
 }
+
+// Email quote PDF to client
+export async function emailQuotePDF(quoteId: string) {
+  const supabase = await createClient()
+
+  // Get quote with items
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select('*')
+    .eq('id', quoteId)
+    .single()
+
+  if (quoteError || !quote) {
+    return { error: 'Quote not found' }
+  }
+
+  const { data: serviceItems, error: itemsError } = await supabase
+    .from('quote_service_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+    .order('created_at', { ascending: true })
+
+  if (itemsError) {
+    return { error: itemsError.message }
+  }
+
+  // Send email with quote details
+  const nodemailer = await import('nodemailer')
+
+  const transporter = nodemailer.default.createTransport({
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT || '587'),
+    secure: process.env.SMTP_SECURE === 'true',
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  })
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    })
+  }
+
+  const quoteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/quote/${quote.quote_number}`
+  const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/api/quote/${quote.quote_number}/pdf`
+
+  const serviceItemsHtml = (serviceItems || []).map((item: QuoteServiceItem) => `
+    <tr>
+      <td style="padding: 15px; border-bottom: 1px solid #e5e5e5;">
+        <strong style="color: #1a1a2e;">${item.service_name}</strong>
+        ${item.description ? `<br><span style="color: #6b6b6b; font-size: 13px;">${item.description}</span>` : ''}
+      </td>
+      <td style="padding: 15px; border-bottom: 1px solid #e5e5e5; text-align: right; font-weight: 600; color: #1a1a2e;">
+        ${formatCurrency(item.price)}
+      </td>
+    </tr>
+  `).join('')
+
+  const mailOptions = {
+    from: process.env.SMTP_FROM,
+    to: quote.client_email,
+    subject: `Service Quote ${quote.quote_number} - Cadiz & Lluis`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0; }
+            .logo { font-size: 28px; font-weight: bold; letter-spacing: 3px; margin-bottom: 5px; }
+            .tagline { font-size: 12px; letter-spacing: 4px; color: #c9a227; text-transform: uppercase; }
+            .badge { display: inline-block; background: #7c3aed; color: white; padding: 8px 20px; border-radius: 4px; font-size: 12px; font-weight: bold; letter-spacing: 2px; margin-top: 15px; }
+            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; }
+            .quote-info { background: #f8f8f8; padding: 20px; border-radius: 8px; margin: 20px 0; }
+            .total-box { background: #1a1a2e; color: white; padding: 25px; border-radius: 8px; margin: 25px 0; text-align: center; }
+            .total-label { font-size: 12px; letter-spacing: 2px; color: #c9a227; text-transform: uppercase; }
+            .total-value { font-size: 32px; font-weight: bold; margin-top: 5px; }
+            .cta-button { display: inline-block; background: #c9a227; color: #1a1a2e; padding: 15px 40px; border-radius: 4px; text-decoration: none; font-weight: bold; letter-spacing: 1px; margin: 10px 5px; }
+            .cta-secondary { background: transparent; border: 2px solid #1a1a2e; color: #1a1a2e; }
+            .footer { background: #f8f9fa; padding: 25px 30px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none; }
+            .footer-text { font-size: 12px; color: #666; }
+            table { width: 100%; border-collapse: collapse; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="logo">CADIZ & LLUIS</div>
+              <div class="tagline">Luxury Living</div>
+              <div class="badge">SERVICE QUOTE</div>
+            </div>
+            <div class="content">
+              <p>Dear ${quote.client_name},</p>
+              <p>Thank you for your interest in our luxury services. Please find your personalized quote below:</p>
+
+              <div class="quote-info">
+                <div style="display: flex; justify-content: space-between;">
+                  <div>
+                    <strong>Quote Number</strong><br>
+                    <span style="color: #c9a227; font-weight: 600;">${quote.quote_number}</span>
+                  </div>
+                  <div style="text-align: right;">
+                    <strong>Valid Until</strong><br>
+                    <span>${formatDate(quote.expiration_date)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <h3 style="color: #1a1a2e; border-bottom: 2px solid #c9a227; padding-bottom: 10px;">Services</h3>
+              <table>
+                ${serviceItemsHtml}
+              </table>
+
+              <div class="total-box">
+                <div class="total-label">Total Quote</div>
+                <div class="total-value">${formatCurrency(quote.total)}</div>
+              </div>
+
+              ${quote.notes ? `
+                <div style="background: #f8f8f8; padding: 15px 20px; border-left: 4px solid #c9a227; border-radius: 4px; margin: 20px 0;">
+                  <strong style="color: #c9a227; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Notes</strong>
+                  <p style="margin: 8px 0 0 0; color: #6b6b6b;">${quote.notes}</p>
+                </div>
+              ` : ''}
+
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${quoteUrl}" class="cta-button">View Quote Online</a>
+                <a href="${pdfUrl}" class="cta-button cta-secondary">Download PDF</a>
+              </div>
+
+              <p style="color: #6b6b6b; font-size: 13px;">
+                This quote is valid until ${formatDate(quote.expiration_date)}.
+                Please accept or decline online, or contact us if you have any questions.
+              </p>
+
+              <p style="margin-top: 30px;">Best regards,<br><strong>The Cadiz & Lluis Team</strong></p>
+            </div>
+            <div class="footer">
+              <p class="footer-text">
+                <strong>Cadiz & Lluis - Luxury Living</strong><br>
+                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `,
+    text: `
+Service Quote ${quote.quote_number} - Cadiz & Lluis
+
+Dear ${quote.client_name},
+
+Thank you for your interest in our luxury services. Please find your personalized quote below:
+
+Quote Number: ${quote.quote_number}
+Valid Until: ${formatDate(quote.expiration_date)}
+
+Services:
+${(serviceItems || []).map((item: QuoteServiceItem) => `- ${item.service_name}: ${formatCurrency(item.price)}`).join('\n')}
+
+Total: ${formatCurrency(quote.total)}
+
+${quote.notes ? `Notes: ${quote.notes}` : ''}
+
+View your quote online: ${quoteUrl}
+Download PDF: ${pdfUrl}
+
+This quote is valid until ${formatDate(quote.expiration_date)}.
+
+Best regards,
+The Cadiz & Lluis Team
+
+${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
+    `,
+  }
+
+  try {
+    await transporter.sendMail(mailOptions)
+
+    // Update quote status to sent if it was draft
+    if (quote.status === 'draft') {
+      await supabase
+        .from('quotes')
+        .update({
+          status: 'sent',
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', quoteId)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to send quote email:', error)
+    return { error: 'Failed to send email' }
+  }
+}

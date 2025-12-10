@@ -29,6 +29,7 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Download,
 } from 'lucide-react'
 import { Logo } from '@/components/logo'
 import { getQuoteByNumber, acceptQuote, declineQuote, QuoteWithItems, QuoteStatus } from '@/lib/actions/quotes'
@@ -161,18 +162,33 @@ export default function QuoteViewPage() {
       {/* Header */}
       <header className="border-b border-white/20 backdrop-blur-md sticky top-0 z-50 glass-card-accent">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center gap-3">
-            <div className="shimmer">
-              <Logo />
-            </div>
-            <div className="flex flex-col">
-              <div className="luxury-heading text-lg tracking-widest text-white">
-                LUXURY LIVING
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="shimmer">
+                <Logo />
               </div>
-              <div className="text-[10px] tracking-[0.2em] text-white/70 uppercase font-semibold">
-                Cadiz & Lluis
+              <div className="flex flex-col">
+                <div className="luxury-heading text-lg tracking-widest text-white">
+                  LUXURY LIVING
+                </div>
+                <div className="text-[10px] tracking-[0.2em] text-white/70 uppercase font-semibold">
+                  Cadiz & Lluis
+                </div>
               </div>
             </div>
+            <a
+              href={`/api/quote/${quote?.quote_number}/pdf`}
+              download={`${quote?.quote_number}.pdf`}
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                className="bg-white/10 text-white border-white/20 hover:bg-white/20"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download PDF
+              </Button>
+            </a>
           </div>
         </div>
       </header>
