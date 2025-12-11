@@ -633,9 +633,9 @@ async function sendPaymentConfirmationEmail(data: {
             .content { background: #ffffff; padding: 45px 40px; }
             .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
             .detail-box { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 28px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
-            .detail-row { display: flex; justify-content: space-between; padding: 16px 0; font-size: 15px; color: #2d3748; }
-            .detail-row .label { font-weight: 600; color: #718096; }
-            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; }
+            .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; font-size: 15px; color: #2d3748; gap: 20px; }
+            .detail-row .label { font-weight: 600; color: #718096; flex-shrink: 0; }
+            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; flex-shrink: 0; }
             .detail-row.total { padding-top: 18px; margin-top: 12px; border-top: 3px solid #d4af37; font-size: 19px; }
             .detail-row.total .value { font-weight: 800; font-size: 22px; color: #10b981; }
             .cta-container { text-align: center; margin: 35px 0; }
@@ -787,9 +787,9 @@ async function sendInvoiceEmail(data: {
             .content { background: #ffffff; padding: 45px 40px; }
             .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
             .detail-box { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 28px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
-            .detail-row { display: flex; justify-content: space-between; padding: 16px 0; font-size: 15px; color: #2d3748; }
-            .detail-row .label { font-weight: 600; color: #718096; }
-            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; }
+            .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; font-size: 15px; color: #2d3748; gap: 20px; }
+            .detail-row .label { font-weight: 600; color: #718096; flex-shrink: 0; }
+            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; flex-shrink: 0; }
             .detail-row.total { padding-top: 18px; margin-top: 12px; border-top: 3px solid #d4af37; font-size: 19px; }
             .detail-row.total .value { font-weight: 800; font-size: 22px; color: #2d3748; }
             .cta-container { text-align: center; margin: 35px 0; }
