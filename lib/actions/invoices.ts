@@ -611,7 +611,7 @@ async function sendPaymentConfirmationEmail(data: {
     })
   }
 
-  const invoiceUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/invoice/${data.invoiceNumber}`
+  const invoiceUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invoice/${data.invoiceNumber}`
 
   const mailOptions = {
     from: process.env.SMTP_FROM,

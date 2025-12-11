@@ -628,8 +628,7 @@ export async function emailQuotePDF(quoteId: string) {
     })
   }
 
-  const quoteUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/quote/${quote.quote_number}`
-  const pdfUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/api/quote/${quote.quote_number}/pdf`
+  const quoteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/quote/${quote.quote_number}`
 
   const serviceItemsHtml = (serviceItems || []).map((item: QuoteServiceItem) => `
     <tr>
