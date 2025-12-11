@@ -611,6 +611,8 @@ async function sendPaymentConfirmationEmail(data: {
     })
   }
 
+  const invoiceUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'https://luxury-concierge.vercel.app'}/invoice/${data.invoiceNumber}`
+
   const mailOptions = {
     from: process.env.SMTP_FROM,
     to: data.clientEmail,
@@ -620,22 +622,36 @@ async function sendPaymentConfirmationEmail(data: {
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .logo { font-size: 28px; font-weight: bold; letter-spacing: 3px; margin-bottom: 5px; }
-            .tagline { font-size: 12px; letter-spacing: 4px; color: #c9a227; text-transform: uppercase; }
-            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; }
-            .success-badge { display: inline-block; background: #dcfce7; color: #166534; padding: 10px 20px; border-radius: 25px; font-weight: bold; margin-bottom: 20px; }
-            .detail-box { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #c9a227; }
-            .detail-row { padding: 8px 0; font-size: 15px; color: #333; line-height: 1.8; }
-            .detail-row .label { font-weight: 600; color: #666; }
-            .detail-row .value { font-weight: 500; color: #1a1a2e; }
-            .detail-row.total { padding-top: 15px; margin-top: 10px; border-top: 2px solid #1a1a2e; font-size: 18px; }
-            .detail-row.total .value { font-weight: bold; font-size: 20px; color: #1a1a2e; }
-            .footer { background: #f8f9fa; padding: 25px 30px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none; }
-            .footer-text { font-size: 12px; color: #666; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #2d3748; margin: 0; padding: 0; background-color: #f7fafc; }
+            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+            .header { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 50px 40px; text-align: center; }
+            .logo { font-size: 32px; font-weight: 800; letter-spacing: 4px; margin-bottom: 8px; color: #ffffff; }
+            .tagline { font-size: 13px; letter-spacing: 5px; color: #d4af37; text-transform: uppercase; font-weight: 600; }
+            .badge { display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 12px 28px; border-radius: 8px; font-size: 14px; font-weight: 700; letter-spacing: 2px; margin-top: 20px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+            .content { background: #ffffff; padding: 45px 40px; }
+            .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
+            .detail-box { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 28px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
+            .detail-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; color: #2d3748; }
+            .detail-row .label { font-weight: 600; color: #718096; }
+            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; }
+            .detail-row.total { padding-top: 18px; margin-top: 12px; border-top: 3px solid #d4af37; font-size: 19px; }
+            .detail-row.total .value { font-weight: 800; font-size: 22px; color: #10b981; }
+            .cta-container { text-align: center; margin: 35px 0; }
+            .cta-button { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c !important; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; letter-spacing: 1.5px; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); }
+            .info-text { font-size: 14px; color: #718096; line-height: 1.7; margin: 25px 0; }
+            .closing { margin-top: 40px; font-size: 15px; color: #2d3748; }
+            .footer { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
+            .footer-text { font-size: 13px; color: #718096; line-height: 1.8; }
+            .footer-brand { font-weight: 700; color: #2d3748; font-size: 14px; margin-bottom: 4px; }
+            @media only screen and (max-width: 600px) {
+              .content, .footer { padding: 30px 20px !important; }
+              .header { padding: 40px 20px !important; }
+              .logo { font-size: 24px !important; }
+              .detail-row { flex-direction: column; gap: 4px; }
+              .detail-row .value { text-align: left; }
+            }
           </style>
         </head>
         <body>
@@ -643,34 +659,46 @@ async function sendPaymentConfirmationEmail(data: {
             <div class="header">
               <div class="logo">CADIZ & LLUIS</div>
               <div class="tagline">Luxury Living</div>
+              <div class="badge">✓ Payment Successful</div>
             </div>
             <div class="content">
-              <div style="text-align: center;">
-                <div class="success-badge">Payment Successful</div>
-              </div>
-              <p>Dear ${data.clientName},</p>
-              <p>Thank you for your payment. This email confirms that we have received your payment for Invoice <strong>${data.invoiceNumber}</strong>.</p>
+              <p class="greeting">Dear <strong>${data.clientName}</strong>,</p>
+              <p class="greeting">Thank you for your payment! This email confirms that we have successfully received your payment.</p>
 
               <div class="detail-box">
                 <div class="detail-row">
-                  <span class="label">Invoice Number:</span> <span class="value">${data.invoiceNumber}</span>
+                  <span class="label">Invoice Number</span>
+                  <span class="value">${data.invoiceNumber}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="label">Payment Date:</span> <span class="value">${formatDate(data.paidAt)}</span>
+                  <span class="label">Payment Date</span>
+                  <span class="value">${formatDate(data.paidAt)}</span>
                 </div>
                 <div class="detail-row total">
-                  <span class="label">Amount Paid:</span> <span class="value">${formatCurrency(data.total)}</span>
+                  <span class="label">Amount Paid</span>
+                  <span class="value">${formatCurrency(data.total)}</span>
                 </div>
               </div>
 
-              <p>A copy of your paid invoice is available for download. If you have any questions about this payment, please don't hesitate to contact us.</p>
+              <div class="cta-container">
+                <a href="${invoiceUrl}" class="cta-button">View Paid Invoice</a>
+              </div>
 
-              <p style="margin-top: 30px;">Best regards,<br><strong>The Cadiz & Lluis Team</strong></p>
+              <p class="info-text">
+                Your payment has been processed successfully. If you have any questions about this transaction,
+                please don't hesitate to reach out to us.
+              </p>
+
+              <p class="closing">
+                Best regards,<br>
+                <strong>The Cadiz & Lluis Team</strong>
+              </p>
             </div>
             <div class="footer">
+              <p class="footer-brand">Cadiz & Lluis · Luxury Living</p>
               <p class="footer-text">
-                <strong>Cadiz & Lluis - Luxury Living</strong><br>
-                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
+                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}<br>
+                For any inquiries, please contact us at the email above.
               </p>
             </div>
           </div>
@@ -742,28 +770,42 @@ async function sendInvoiceEmail(data: {
   const mailOptions = {
     from: process.env.SMTP_FROM,
     to: data.clientEmail,
-    subject: `New Invoice ${data.invoiceNumber} from ${data.managerName}`,
+    subject: `New Invoice ${data.invoiceNumber} - Cadiz & Lluis`,
     html: `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .logo { font-size: 28px; font-weight: bold; letter-spacing: 3px; margin-bottom: 5px; }
-            .tagline { font-size: 12px; letter-spacing: 4px; color: #c9a227; text-transform: uppercase; }
-            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; }
-            .detail-box { background: #f8f9fa; padding: 25px; border-radius: 8px; margin: 25px 0; border-left: 4px solid #c9a227; }
-            .detail-row { padding: 8px 0; font-size: 15px; color: #333; line-height: 1.8; }
-            .detail-row .label { font-weight: 600; color: #666; }
-            .detail-row .value { font-weight: 500; color: #1a1a2e; }
-            .detail-row.total { padding-top: 15px; margin-top: 10px; border-top: 2px solid #1a1a2e; font-size: 18px; }
-            .detail-row.total .value { font-weight: bold; font-size: 20px; color: #1a1a2e; }
-            .button { display: inline-block; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white !important; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; margin: 20px 0; }
-            .footer { background: #f8f9fa; padding: 25px 30px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none; }
-            .footer-text { font-size: 12px; color: #666; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #2d3748; margin: 0; padding: 0; background-color: #f7fafc; }
+            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+            .header { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 50px 40px; text-align: center; }
+            .logo { font-size: 32px; font-weight: 800; letter-spacing: 4px; margin-bottom: 8px; color: #ffffff; }
+            .tagline { font-size: 13px; letter-spacing: 5px; color: #d4af37; text-transform: uppercase; font-weight: 600; }
+            .badge { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 700; letter-spacing: 2px; margin-top: 20px; text-transform: uppercase; }
+            .content { background: #ffffff; padding: 45px 40px; }
+            .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
+            .detail-box { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 28px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
+            .detail-row { display: flex; justify-content: space-between; padding: 10px 0; font-size: 15px; color: #2d3748; }
+            .detail-row .label { font-weight: 600; color: #718096; }
+            .detail-row .value { font-weight: 600; color: #2d3748; text-align: right; }
+            .detail-row.total { padding-top: 18px; margin-top: 12px; border-top: 3px solid #d4af37; font-size: 19px; }
+            .detail-row.total .value { font-weight: 800; font-size: 22px; color: #2d3748; }
+            .cta-container { text-align: center; margin: 35px 0; }
+            .cta-button { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c !important; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; letter-spacing: 1.5px; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); }
+            .info-text { font-size: 14px; color: #718096; line-height: 1.7; margin: 25px 0; }
+            .closing { margin-top: 40px; font-size: 15px; color: #2d3748; }
+            .footer { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
+            .footer-text { font-size: 13px; color: #718096; line-height: 1.8; }
+            .footer-brand { font-weight: 700; color: #2d3748; font-size: 14px; margin-bottom: 4px; }
+            @media only screen and (max-width: 600px) {
+              .content, .footer { padding: 30px 20px !important; }
+              .header { padding: 40px 20px !important; }
+              .logo { font-size: 24px !important; }
+              .detail-row { flex-direction: column; gap: 4px; }
+              .detail-row .value { text-align: left; }
+            }
           </style>
         </head>
         <body>
@@ -771,37 +813,46 @@ async function sendInvoiceEmail(data: {
             <div class="header">
               <div class="logo">CADIZ & LLUIS</div>
               <div class="tagline">Luxury Living</div>
+              <div class="badge">New Invoice</div>
             </div>
             <div class="content">
-              <p>Dear ${data.clientName},</p>
-              <p>You have received a new invoice from <strong>${data.managerName}</strong>.</p>
+              <p class="greeting">Dear <strong>${data.clientName}</strong>,</p>
+              <p class="greeting">You have received a new invoice from <strong>${data.managerName}</strong>. Please review the details below:</p>
 
               <div class="detail-box">
                 <div class="detail-row">
-                  <span class="label">Invoice Number:</span> <span class="value">${data.invoiceNumber}</span>
+                  <span class="label">Invoice Number</span>
+                  <span class="value">${data.invoiceNumber}</span>
                 </div>
                 <div class="detail-row">
-                  <span class="label">Due Date:</span> <span class="value">${formatDate(data.dueDate)}</span>
+                  <span class="label">Due Date</span>
+                  <span class="value">${formatDate(data.dueDate)}</span>
                 </div>
                 <div class="detail-row total">
-                  <span class="label">Total Amount:</span> <span class="value">${formatCurrency(data.total)}</span>
+                  <span class="label">Total Amount</span>
+                  <span class="value">${formatCurrency(data.total)}</span>
                 </div>
               </div>
 
-              <div style="text-align: center;">
-                <a href="${paymentUrl}" class="button">View & Pay Invoice</a>
+              <div class="cta-container">
+                <a href="${paymentUrl}" class="cta-button">View & Pay Invoice</a>
               </div>
 
-              <p style="font-size: 14px; color: #666; margin-top: 30px;">
-                Click the button above to view your invoice details and make a payment online.
+              <p class="info-text">
+                Click the button above to view your full invoice details and make a secure payment online.
+                If you have any questions, please feel free to contact us.
               </p>
 
-              <p style="margin-top: 30px;">Best regards,<br><strong>${data.managerName}</strong></p>
+              <p class="closing">
+                Best regards,<br>
+                <strong>${data.managerName}</strong>
+              </p>
             </div>
             <div class="footer">
+              <p class="footer-brand">Cadiz & Lluis · Luxury Living</p>
               <p class="footer-text">
-                <strong>Cadiz & Lluis - Luxury Living</strong><br>
-                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
+                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}<br>
+                For any inquiries, please contact us at the email above.
               </p>
             </div>
           </div>

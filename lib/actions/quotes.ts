@@ -633,11 +633,11 @@ export async function emailQuotePDF(quoteId: string) {
 
   const serviceItemsHtml = (serviceItems || []).map((item: QuoteServiceItem) => `
     <tr>
-      <td style="padding: 15px; border-bottom: 1px solid #e5e5e5;">
-        <strong style="color: #1a1a2e;">${item.service_name}</strong>
-        ${item.description ? `<br><span style="color: #6b6b6b; font-size: 13px;">${item.description}</span>` : ''}
+      <td>
+        <div class="service-name">${item.service_name}</div>
+        ${item.description ? `<div class="service-desc">${item.description}</div>` : ''}
       </td>
-      <td style="padding: 15px; border-bottom: 1px solid #e5e5e5; text-align: right; font-weight: 600; color: #1a1a2e;">
+      <td class="service-price">
         ${formatCurrency(item.price)}
       </td>
     </tr>
@@ -652,23 +652,53 @@ export async function emailQuotePDF(quoteId: string) {
       <html>
         <head>
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 8px 8px 0 0; }
-            .logo { font-size: 28px; font-weight: bold; letter-spacing: 3px; margin-bottom: 5px; }
-            .tagline { font-size: 12px; letter-spacing: 4px; color: #c9a227; text-transform: uppercase; }
-            .badge { display: inline-block; background: #7c3aed; color: white; padding: 8px 20px; border-radius: 4px; font-size: 12px; font-weight: bold; letter-spacing: 2px; margin-top: 15px; }
-            .content { background: #ffffff; padding: 40px 30px; border: 1px solid #e0e0e0; border-top: none; }
-            .quote-info { background: #f8f8f8; padding: 20px; border-radius: 8px; margin: 20px 0; }
-            .total-box { background: #1a1a2e; color: white; padding: 25px; border-radius: 8px; margin: 25px 0; text-align: center; }
-            .total-label { font-size: 12px; letter-spacing: 2px; color: #c9a227; text-transform: uppercase; }
-            .total-value { font-size: 32px; font-weight: bold; margin-top: 5px; }
-            .cta-button { display: inline-block; background: #c9a227; color: #1a1a2e; padding: 15px 40px; border-radius: 4px; text-decoration: none; font-weight: bold; letter-spacing: 1px; margin: 10px 5px; }
-            .cta-secondary { background: transparent; border: 2px solid #1a1a2e; color: #1a1a2e; }
-            .footer { background: #f8f9fa; padding: 25px 30px; text-align: center; border-radius: 0 0 8px 8px; border: 1px solid #e0e0e0; border-top: none; }
-            .footer-text { font-size: 12px; color: #666; }
-            table { width: 100%; border-collapse: collapse; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #2d3748; margin: 0; padding: 0; background-color: #f7fafc; }
+            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+            .header { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 50px 40px; text-align: center; }
+            .logo { font-size: 32px; font-weight: 800; letter-spacing: 4px; margin-bottom: 8px; color: #ffffff; }
+            .tagline { font-size: 13px; letter-spacing: 5px; color: #d4af37; text-transform: uppercase; font-weight: 600; }
+            .badge { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 700; letter-spacing: 2px; margin-top: 20px; text-transform: uppercase; }
+            .content { background: #ffffff; padding: 45px 40px; }
+            .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
+            .quote-info { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 24px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
+            .info-grid { display: table; width: 100%; }
+            .info-item { display: table-cell; vertical-align: top; padding: 8px 0; }
+            .info-item.right { text-align: right; }
+            .info-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 4px; }
+            .info-value { font-size: 16px; font-weight: 600; color: #2d3748; }
+            .info-value.accent { color: #d4af37; }
+            .section-title { font-size: 18px; font-weight: 700; color: #2d3748; margin: 35px 0 20px 0; padding-bottom: 12px; border-bottom: 3px solid #d4af37; }
+            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+            tr { border-bottom: 1px solid #e2e8f0; }
+            td { padding: 20px 0; vertical-align: top; }
+            .service-name { font-size: 16px; font-weight: 600; color: #2d3748; margin-bottom: 4px; }
+            .service-desc { font-size: 14px; color: #718096; line-height: 1.5; }
+            .service-price { font-size: 18px; font-weight: 700; color: #2d3748; text-align: right; white-space: nowrap; }
+            .total-box { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 35px; border-radius: 12px; margin: 35px 0; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
+            .total-label { font-size: 13px; letter-spacing: 3px; color: #d4af37; text-transform: uppercase; font-weight: 700; margin-bottom: 10px; }
+            .total-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: 1px; }
+            .notes-box { background: #fffbeb; padding: 20px 24px; border-left: 4px solid #d4af37; border-radius: 6px; margin: 25px 0; }
+            .notes-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #d4af37; margin-bottom: 8px; }
+            .notes-text { font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0; }
+            .cta-container { text-align: center; margin: 40px 0; padding: 0 20px; }
+            .cta-button { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c !important; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; letter-spacing: 1.5px; margin: 8px 6px; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); transition: all 0.3s; }
+            .cta-button:hover { box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4); transform: translateY(-1px); }
+            .cta-secondary { background: transparent; border: 2px solid #2d3748; color: #2d3748 !important; box-shadow: none; }
+            .cta-secondary:hover { background: #f7fafc; }
+            .info-text { font-size: 14px; color: #718096; line-height: 1.7; margin: 25px 0; }
+            .closing { margin-top: 40px; font-size: 15px; color: #2d3748; }
+            .footer { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
+            .footer-text { font-size: 13px; color: #718096; line-height: 1.8; }
+            .footer-brand { font-weight: 700; color: #2d3748; font-size: 14px; margin-bottom: 4px; }
+            @media only screen and (max-width: 600px) {
+              .content, .footer { padding: 30px 20px !important; }
+              .header { padding: 40px 20px !important; }
+              .logo { font-size: 24px !important; }
+              .total-value { font-size: 32px !important; }
+              .cta-button { display: block; margin: 10px 0 !important; }
+            }
           </style>
         </head>
         <body>
@@ -676,26 +706,26 @@ export async function emailQuotePDF(quoteId: string) {
             <div class="header">
               <div class="logo">CADIZ & LLUIS</div>
               <div class="tagline">Luxury Living</div>
-              <div class="badge">SERVICE QUOTE</div>
+              <div class="badge">Service Quote</div>
             </div>
             <div class="content">
-              <p>Dear ${quote.client_name},</p>
-              <p>Thank you for your interest in our luxury services. Please find your personalized quote below:</p>
+              <p class="greeting">Dear <strong>${quote.client_name}</strong>,</p>
+              <p class="greeting">Thank you for your interest in our luxury services. We're delighted to present your personalized quote below:</p>
 
               <div class="quote-info">
-                <div style="display: flex; justify-content: space-between;">
-                  <div>
-                    <strong>Quote Number</strong><br>
-                    <span style="color: #c9a227; font-weight: 600;">${quote.quote_number}</span>
+                <div class="info-grid">
+                  <div class="info-item">
+                    <div class="info-label">Quote Number</div>
+                    <div class="info-value accent">${quote.quote_number}</div>
                   </div>
-                  <div style="text-align: right;">
-                    <strong>Valid Until</strong><br>
-                    <span>${formatDate(quote.expiration_date)}</span>
+                  <div class="info-item right">
+                    <div class="info-label">Valid Until</div>
+                    <div class="info-value">${formatDate(quote.expiration_date)}</div>
                   </div>
                 </div>
               </div>
 
-              <h3 style="color: #1a1a2e; border-bottom: 2px solid #c9a227; padding-bottom: 10px;">Services</h3>
+              <h3 class="section-title">Services Included</h3>
               <table>
                 ${serviceItemsHtml}
               </table>
@@ -706,28 +736,31 @@ export async function emailQuotePDF(quoteId: string) {
               </div>
 
               ${quote.notes ? `
-                <div style="background: #f8f8f8; padding: 15px 20px; border-left: 4px solid #c9a227; border-radius: 4px; margin: 20px 0;">
-                  <strong style="color: #c9a227; font-size: 11px; letter-spacing: 1px; text-transform: uppercase;">Notes</strong>
-                  <p style="margin: 8px 0 0 0; color: #6b6b6b;">${quote.notes}</p>
+                <div class="notes-box">
+                  <div class="notes-label">Additional Notes</div>
+                  <p class="notes-text">${quote.notes}</p>
                 </div>
               ` : ''}
 
-              <div style="text-align: center; margin: 30px 0;">
+              <div class="cta-container">
                 <a href="${quoteUrl}" class="cta-button">View Quote Online</a>
-                <a href="${pdfUrl}" class="cta-button cta-secondary">Download PDF</a>
               </div>
 
-              <p style="color: #6b6b6b; font-size: 13px;">
-                This quote is valid until ${formatDate(quote.expiration_date)}.
-                Please accept or decline online, or contact us if you have any questions.
+              <p class="info-text">
+                This quote is valid until <strong>${formatDate(quote.expiration_date)}</strong>.
+                Please view the quote online to accept or decline, or contact us if you have any questions.
               </p>
 
-              <p style="margin-top: 30px;">Best regards,<br><strong>The Cadiz & Lluis Team</strong></p>
+              <p class="closing">
+                Best regards,<br>
+                <strong>The Cadiz & Lluis Team</strong>
+              </p>
             </div>
             <div class="footer">
+              <p class="footer-brand">Cadiz & Lluis · Luxury Living</p>
               <p class="footer-text">
-                <strong>Cadiz & Lluis - Luxury Living</strong><br>
-                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}
+                ${process.env.CONTACT_EMAIL || 'concierge@cadizlluis.com'}<br>
+                For any inquiries, please contact us at the email above.
               </p>
             </div>
           </div>
