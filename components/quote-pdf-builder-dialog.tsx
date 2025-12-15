@@ -242,6 +242,11 @@ export function QuotePDFBuilderDialog({
         htmlContent = htmlContent.replace(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), base64)
       })
 
+      // Replace Lucide SVG icons with inline SVG (they come as <svg> elements from React)
+      // The SVGs should already be in the HTML, but we need to ensure they're styled correctly
+      // Add inline styles to SVG elements
+      htmlContent = htmlContent.replace(/<svg/g, '<svg style="width: 1.25rem; height: 1.25rem; display: inline-block; vertical-align: middle;"')
+
       // Write the print document
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -347,11 +352,12 @@ export function QuotePDFBuilderDialog({
             .rounded-full { border-radius: 9999px; }
             .rounded-2xl { border-radius: 1rem; }
 
-            .border-b { border-bottom-width: 1px; }
-            .border-b-8 { border-bottom-width: 8px; }
-            .border-t { border-top-width: 1px; }
+            .border-b { border-bottom-width: 1px; border-bottom-style: solid; }
+            .border-b-8 { border-bottom-width: 8px; border-bottom-style: solid; }
+            .border-t { border-top-width: 1px; border-top-style: solid; }
             .border-gray-100 { border-color: #f3f4f6; }
             .border-gray-200 { border-color: #e5e7eb; }
+            .border-white\\/10 { border-color: rgba(255,255,255,0.1); }
 
             .overflow-hidden { overflow: hidden; }
             .relative { position: relative; }
@@ -373,6 +379,18 @@ export function QuotePDFBuilderDialog({
               max-width: 100%;
               height: auto;
             }
+
+            svg {
+              width: 1.25rem;
+              height: 1.25rem;
+              display: inline-block;
+              vertical-align: middle;
+              stroke: currentColor;
+              fill: none;
+            }
+
+            .h-5 { height: 1.25rem; }
+            .w-5 { width: 1.25rem; }
 
             @media print {
               body {
@@ -647,6 +665,32 @@ export function QuotePDFBuilderDialog({
                   </div>
                 </div>
 
+                {/* Header Icon Selection */}
+                <div className="space-y-2">
+                  <Label className="text-white/90 text-sm">Header Icon</Label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'plane', label: 'Airplane', icon: Plane },
+                      { value: 'car', label: 'Car', icon: Car },
+                      { value: 'yacht', label: 'Yacht', icon: Ship },
+                      { value: 'none', label: 'No Icon', icon: null },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setHeaderIcon(option.value as 'plane' | 'car' | 'yacht' | 'none')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                          headerIcon === option.value
+                            ? 'bg-white text-black border-white'
+                            : 'bg-white/5 text-white/70 border-white/20 hover:border-white/40'
+                        }`}
+                      >
+                        {option.icon && <option.icon className="h-4 w-4" />}
+                        <span className="text-sm">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Service Items Section */}
@@ -977,31 +1021,34 @@ export function QuotePDFBuilderDialog({
               <div ref={previewRef} className="h-full overflow-y-auto p-6" style={{ backgroundColor: '#f8f8f8' }}>
                 {/* PDF Preview - Ticket Style */}
                 <div className="max-w-[400px] mx-auto bg-white rounded-2xl shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-                  {/* Top Header with Logo */}
-                  <div className="bg-white px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                  {/* Top Header with Logo - Dark like footer */}
+                  <div className="bg-gray-900 px-5 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <img
-                        src="/logo/CL Balck LOGO .png"
+                        src="/logo/CL White LOGO.png"
                         alt="Cadiz & Lluis"
                         className="h-10 w-10 object-contain"
                       />
-                      <span className="text-sm font-bold text-gray-900 tracking-widest">CADIZ & LLUIS</span>
+                      <span className="text-sm font-bold text-white tracking-widest">CADIZ & LLUIS</span>
                     </div>
                     <div className="text-right">
-                      <p className="text-[10px] text-gray-400 uppercase tracking-wider">{quote.quote_number}</p>
-                      <p className="text-[9px] text-gray-400">
+                      <p className="text-[10px] text-white/60 uppercase tracking-wider">{quote.quote_number}</p>
+                      <p className="text-[9px] text-white/50">
                         {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                       </p>
                     </div>
                   </div>
 
-                  {/* Title Header */}
-                  <div className="bg-white p-4 text-center border-b border-gray-100">
-                    <h1 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
+                  {/* Title Header - Dark like footer */}
+                  <div className="bg-gray-900 p-4 text-center border-t border-white/10">
+                    <h1 className="text-xl font-bold text-white flex items-center justify-center gap-2">
+                      {headerIcon === 'plane' && <Plane className="h-5 w-5" />}
+                      {headerIcon === 'car' && <Car className="h-5 w-5" />}
+                      {headerIcon === 'yacht' && <Ship className="h-5 w-5" />}
                       {headerTitle || 'Private Quotes'}
                     </h1>
                     {headerSubtitle && (
-                      <p className="text-xs text-gray-500 mt-1">{headerSubtitle}</p>
+                      <p className="text-xs text-white/60 mt-1">{headerSubtitle}</p>
                     )}
                   </div>
 
