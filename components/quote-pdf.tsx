@@ -201,13 +201,13 @@ const styles = StyleSheet.create({
   serviceImages: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
   },
   serviceImage: {
     width: 120,
     height: 80,
-    objectFit: 'cover',
     borderRadius: 4,
+    marginRight: 8,
+    marginBottom: 8,
   },
   // Totals
   totalsSection: {

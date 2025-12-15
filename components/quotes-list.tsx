@@ -44,10 +44,11 @@ import {
   Download,
   Mail,
   Receipt,
+  Settings,
 } from 'lucide-react'
-import { Quote, QuoteStatus, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
+import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
-import { generateQuotePDF } from '@/lib/pdf-generator'
+import { QuotePDFBuilderDialog } from './quote-pdf-builder-dialog'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-300 border-gray-500/30', icon: FileText },
@@ -70,6 +71,9 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   const [isEmailing, setIsEmailing] = useState(false)
   const [convertDialogOpen, setConvertDialogOpen] = useState(false)
   const [isConverting, setIsConverting] = useState(false)
+  const [pdfBuilderOpen, setPdfBuilderOpen] = useState(false)
+  const [selectedQuoteWithItems, setSelectedQuoteWithItems] = useState<QuoteWithItems | null>(null)
+  const [isLoadingQuoteData, setIsLoadingQuoteData] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -131,15 +135,22 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
 
   const handleDownloadPDF = async (quote: Quote) => {
     try {
-      // Fetch full quote data with service items
-      const response = await fetch(`/api/quote-data/${quote.id}`)
+      // Use the new server-side PDF generation
+      const response = await fetch(`/api/quotes/${quote.id}/pdf`)
       if (!response.ok) {
-        throw new Error('Failed to fetch quote data')
+        throw new Error('Failed to generate PDF')
       }
-      const fullQuote = await response.json()
 
-      const pdf = generateQuotePDF(fullQuote)
-      pdf.save(`${quote.quote_number}.pdf`)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${quote.quote_number}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
       toast({
         title: 'PDF Downloaded',
         description: `Quote ${quote.quote_number} has been downloaded.`,
@@ -151,6 +162,28 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
         description: 'Failed to generate PDF. Please try again.',
         variant: 'destructive',
       })
+    }
+  }
+
+  const handleOpenPdfBuilder = async (quote: Quote) => {
+    setIsLoadingQuoteData(true)
+    try {
+      const response = await fetch(`/api/quote-data/${quote.id}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch quote data')
+      }
+      const fullQuote = await response.json()
+      setSelectedQuoteWithItems(fullQuote)
+      setPdfBuilderOpen(true)
+    } catch (error) {
+      console.error('Error loading quote data:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load quote data. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoadingQuoteData(false)
     }
   }
 
@@ -385,6 +418,16 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                           )}
                           {quote.status !== 'draft' && (
                             <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenPdfBuilder(quote)}
+                                disabled={isLoadingQuoteData}
+                                className="text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
+                                title="Customize PDF"
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
                               {quote.status === 'accepted' && !quote.converted_to_invoice_id && (
                                 <Button
                                   variant="ghost"
@@ -565,6 +608,16 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                       </>
                     ) : (
                       <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenPdfBuilder(quote)}
+                          disabled={isLoadingQuoteData}
+                          className="flex-1 text-cyan-400 border-cyan-400/30 hover:bg-cyan-500/10"
+                        >
+                          <Settings className="h-4 w-4 mr-2" />
+                          Customize
+                        </Button>
                         {quote.status === 'accepted' && !quote.converted_to_invoice_id && (
                           <Button
                             variant="outline"
@@ -738,6 +791,21 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* PDF Builder Dialog */}
+      {selectedQuoteWithItems && (
+        <QuotePDFBuilderDialog
+          quote={selectedQuoteWithItems}
+          isOpen={pdfBuilderOpen}
+          onClose={() => {
+            setPdfBuilderOpen(false)
+            setSelectedQuoteWithItems(null)
+          }}
+          onSave={() => {
+            router.refresh()
+          }}
+        />
+      )}
     </div>
   )
 }

@@ -34,7 +34,6 @@ import {
 import { Logo } from '@/components/logo'
 import { getQuoteByNumber, acceptQuote, declineQuote, QuoteWithItems, QuoteStatus } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
-import { generateQuotePDF } from '@/lib/pdf-generator'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-300 border-gray-500/30', icon: FileText },
@@ -125,15 +124,22 @@ export default function QuoteViewPage() {
     if (!quote) return
 
     try {
-      // Fetch full quote data with service items
-      const response = await fetch(`/api/quote-data/${quote.id}`)
+      // Use the new server-side PDF generation with customization support
+      const response = await fetch(`/api/quote-pdf/${quote.id}`)
       if (!response.ok) {
-        throw new Error('Failed to fetch quote data')
+        throw new Error('Failed to generate PDF')
       }
-      const fullQuote = await response.json()
 
-      const pdf = generateQuotePDF(fullQuote)
-      pdf.save(`${quote.quote_number}.pdf`)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${quote.quote_number}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
       toast({
         title: 'PDF Downloaded',
         description: `Quote ${quote.quote_number} has been downloaded.`,

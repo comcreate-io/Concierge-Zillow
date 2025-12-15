@@ -33,10 +33,31 @@ export type Quote = {
   viewed_at: string | null
   responded_at: string | null
   converted_to_invoice_id: string | null
+  pdf_customization: PDFCustomization | null
 }
 
 export type QuoteWithItems = Quote & {
   service_items: QuoteServiceItem[]
+}
+
+// PDF Customization types for visual quote builder
+export type ServiceOverride = {
+  display_name?: string
+  display_description?: string
+  display_images?: string[]  // Selected images (max 2) from available images
+  details?: { label: string; value: string }[]  // e.g., Date, Departure, Arrival
+}
+
+export type PDFCustomization = {
+  header_title?: string
+  header_subtitle?: string
+  header_icon?: 'plane' | 'car' | 'yacht' | 'none'
+  service_overrides?: {
+    [serviceItemId: string]: ServiceOverride
+  }
+  custom_notes?: string
+  custom_terms?: string
+  accent_color?: string
 }
 
 // Generate unique quote number (e.g., QT-2024-001)
@@ -402,6 +423,44 @@ export async function sendQuote(quoteId: string) {
 
   revalidatePath('/admin/quotes')
   return { success: true }
+}
+
+// Update quote PDF customization
+export async function updateQuotePDFCustomization(quoteId: string, customization: PDFCustomization) {
+  const supabase = await createClient()
+
+  const { error } = await supabase
+    .from('quotes')
+    .update({
+      pdf_customization: customization,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quoteId)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/quotes')
+  revalidatePath(`/admin/quotes/${quoteId}/edit`)
+  return { success: true }
+}
+
+// Get quote PDF customization
+export async function getQuotePDFCustomization(quoteId: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('quotes')
+    .select('pdf_customization')
+    .eq('id', quoteId)
+    .single()
+
+  if (error) {
+    return { error: error.message, data: null }
+  }
+
+  return { data: data?.pdf_customization as PDFCustomization | null }
 }
 
 // Duplicate quote
