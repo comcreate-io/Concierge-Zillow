@@ -210,13 +210,59 @@ export function QuotePDFBuilderDialog({
       // Small delay to ensure full render
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      // Capture the ticket element with html2canvas
+      // Capture the element with html2canvas, removing problematic stylesheets
       const canvas = await html2canvas(ticketElement, {
         scale: 2, // Higher quality
         useCORS: true, // Allow cross-origin images
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        onclone: (clonedDoc) => {
+          // Remove all stylesheets that contain oklch to avoid parsing errors
+          const stylesheets = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]')
+          stylesheets.forEach((sheet) => {
+            if (sheet instanceof HTMLStyleElement && sheet.textContent?.includes('oklch')) {
+              sheet.remove()
+            } else if (sheet instanceof HTMLLinkElement) {
+              // Remove external stylesheets that might contain oklch
+              sheet.remove()
+            }
+          })
+
+          // Add clean styles for the PDF
+          const cleanStyle = clonedDoc.createElement('style')
+          cleanStyle.textContent = `
+            * {
+              font-family: Inter, system-ui, -apple-system, sans-serif !important;
+            }
+            .bg-white { background-color: #ffffff !important; }
+            .bg-gray-900 { background-color: #111827 !important; }
+            .bg-gray-100 { background-color: #f3f4f6 !important; }
+            .bg-black\\/60 { background-color: rgba(0,0,0,0.6) !important; }
+            .bg-white\\/95 { background-color: rgba(255,255,255,0.95) !important; }
+            .text-white { color: #ffffff !important; }
+            .text-white\\/60 { color: rgba(255,255,255,0.6) !important; }
+            .text-white\\/50 { color: rgba(255,255,255,0.5) !important; }
+            .text-white\\/70 { color: rgba(255,255,255,0.7) !important; }
+            .text-gray-900 { color: #111827 !important; }
+            .text-gray-700 { color: #374151 !important; }
+            .text-gray-500 { color: #6b7280 !important; }
+            .text-gray-400 { color: #9ca3af !important; }
+            .text-gray-300 { color: #d1d5db !important; }
+            .text-blue-500 { color: #3b82f6 !important; }
+            .border-gray-100 { border-color: #f3f4f6 !important; }
+            .border-gray-200 { border-color: #e5e7eb !important; }
+            .rounded-2xl { border-radius: 1rem !important; }
+            .rounded-full { border-radius: 9999px !important; }
+            .rounded-lg { border-radius: 0.5rem !important; }
+            .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1) !important; }
+            .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1) !important; }
+            .overflow-hidden { overflow: hidden !important; }
+            .object-cover { object-fit: cover !important; }
+            .backdrop-blur-sm { backdrop-filter: none !important; }
+          `
+          clonedDoc.head.appendChild(cleanStyle)
+        }
       })
 
       // Calculate PDF dimensions based on canvas aspect ratio
