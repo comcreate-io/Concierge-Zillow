@@ -207,165 +207,212 @@ export function QuotePDFBuilderDialog({
         })
       )
 
-      // Small delay to ensure full render
-      await new Promise(resolve => setTimeout(resolve, 300))
+      // Use browser print to PDF - opens print dialog where user can save as PDF
+      // This handles all modern CSS including oklch/oklab colors
+      const printWindow = window.open('', '_blank', 'width=500,height=800')
 
-      // Helper function to copy computed styles as inline styles
-      const copyComputedStyles = (source: Element, target: HTMLElement) => {
-        const computedStyle = window.getComputedStyle(source)
-        const importantStyles = [
-          'display', 'flex-direction', 'justify-content', 'align-items', 'gap',
-          'width', 'height', 'max-width', 'min-height',
-          'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-          'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-          'background-color', 'background-image', 'background-size', 'background-position',
-          'color', 'font-size', 'font-weight', 'font-family', 'line-height', 'letter-spacing',
-          'text-align', 'text-transform',
-          'border', 'border-width', 'border-style', 'border-color', 'border-radius',
-          'border-top', 'border-bottom', 'border-left', 'border-right',
-          'box-shadow', 'overflow', 'position', 'top', 'right', 'bottom', 'left',
-          'object-fit', 'opacity', 'z-index', 'flex', 'flex-grow', 'flex-shrink',
-        ]
+      if (!printWindow) {
+        throw new Error('Could not open print window. Please allow popups.')
+      }
 
-        importantStyles.forEach(prop => {
-          const value = computedStyle.getPropertyValue(prop)
-          if (value && value !== 'none' && value !== 'auto' && value !== 'normal') {
-            // Convert oklch colors to hex fallbacks
-            if (value.includes('oklch')) {
-              if (prop.includes('background')) {
-                target.style.setProperty(prop, '#ffffff')
-              } else if (prop.includes('color')) {
-                target.style.setProperty(prop, '#000000')
+      // Get all images and convert to base64 for the print window
+      const imagePromises = Array.from(ticketElement.querySelectorAll('img')).map(async (img) => {
+        try {
+          const response = await fetch(img.src)
+          const blob = await response.blob()
+          return new Promise<{src: string, base64: string}>((resolve) => {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+              resolve({ src: img.src, base64: reader.result as string })
+            }
+            reader.readAsDataURL(blob)
+          })
+        } catch {
+          return { src: img.src, base64: img.src }
+        }
+      })
+
+      const imageData = await Promise.all(imagePromises)
+
+      // Clone the HTML content
+      let htmlContent = ticketElement.outerHTML
+
+      // Replace image sources with base64
+      imageData.forEach(({ src, base64 }) => {
+        htmlContent = htmlContent.replace(new RegExp(src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), base64)
+      })
+
+      // Write the print document
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${quote.quote_number}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+            * {
+              margin: 0;
+              padding: 0;
+              box-sizing: border-box;
+            }
+
+            body {
+              font-family: 'Inter', system-ui, -apple-system, sans-serif;
+              background: #ffffff;
+              padding: 20px;
+              display: flex;
+              justify-content: center;
+            }
+
+            .ticket-container {
+              max-width: 400px;
+              background: #ffffff;
+              border-radius: 16px;
+              overflow: hidden;
+              box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+            }
+
+            /* Tailwind-like utilities */
+            .bg-white { background-color: #ffffff; }
+            .bg-gray-900 { background-color: #111827; }
+            .bg-gray-100 { background-color: #f3f4f6; }
+            .bg-black\\/60 { background-color: rgba(0,0,0,0.6); }
+            .bg-white\\/95 { background-color: rgba(255,255,255,0.95); }
+
+            .text-white { color: #ffffff; }
+            .text-gray-900 { color: #111827; }
+            .text-gray-700 { color: #374151; }
+            .text-gray-500 { color: #6b7280; }
+            .text-gray-400 { color: #9ca3af; }
+            .text-gray-300 { color: #d1d5db; }
+            .text-blue-500 { color: #3b82f6; }
+            .text-white\\/60 { color: rgba(255,255,255,0.6); }
+            .text-white\\/50 { color: rgba(255,255,255,0.5); }
+            .text-white\\/70 { color: rgba(255,255,255,0.7); }
+
+            .text-xs { font-size: 0.75rem; line-height: 1rem; }
+            .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+            .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+            .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+            .text-\\[9px\\] { font-size: 9px; }
+            .text-\\[10px\\] { font-size: 10px; }
+
+            .font-bold { font-weight: 700; }
+            .font-semibold { font-weight: 600; }
+
+            .text-center { text-align: center; }
+            .text-left { text-align: left; }
+            .text-right { text-align: right; }
+
+            .uppercase { text-transform: uppercase; }
+            .tracking-wider { letter-spacing: 0.05em; }
+            .tracking-widest { letter-spacing: 0.1em; }
+
+            .p-4 { padding: 1rem; }
+            .p-5 { padding: 1.25rem; }
+            .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+            .px-5 { padding-left: 1.25rem; padding-right: 1.25rem; }
+            .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+            .py-1\\.5 { padding-top: 0.375rem; padding-bottom: 0.375rem; }
+            .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+            .py-4 { padding-top: 1rem; padding-bottom: 1rem; }
+            .px-2\\.5 { padding-left: 0.625rem; padding-right: 0.625rem; }
+            .pt-4 { padding-top: 1rem; }
+
+            .mb-1 { margin-bottom: 0.25rem; }
+            .mb-3 { margin-bottom: 0.75rem; }
+            .mb-4 { margin-bottom: 1rem; }
+            .mb-5 { margin-bottom: 1.25rem; }
+            .mt-1 { margin-top: 0.25rem; }
+            .mx-2 { margin-left: 0.5rem; margin-right: 0.5rem; }
+
+            .gap-1 { gap: 0.25rem; }
+            .gap-1\\.5 { gap: 0.375rem; }
+            .gap-2 { gap: 0.5rem; }
+
+            .flex { display: flex; }
+            .flex-1 { flex: 1 1 0%; }
+            .flex-col { flex-direction: column; }
+            .items-center { align-items: center; }
+            .justify-center { justify-content: center; }
+            .justify-between { justify-content: space-between; }
+
+            .w-full { width: 100%; }
+            .w-10 { width: 2.5rem; }
+            .h-10 { height: 2.5rem; }
+            .h-44 { height: 11rem; }
+            .h-px { height: 1px; }
+
+            .rounded-full { border-radius: 9999px; }
+            .rounded-2xl { border-radius: 1rem; }
+
+            .border-b { border-bottom-width: 1px; }
+            .border-b-8 { border-bottom-width: 8px; }
+            .border-t { border-top-width: 1px; }
+            .border-gray-100 { border-color: #f3f4f6; }
+            .border-gray-200 { border-color: #e5e7eb; }
+
+            .overflow-hidden { overflow: hidden; }
+            .relative { position: relative; }
+            .absolute { position: absolute; }
+            .top-3 { top: 0.75rem; }
+            .left-3 { left: 0.75rem; }
+            .bottom-3 { bottom: 0.75rem; }
+            .right-3 { right: 0.75rem; }
+
+            .object-cover { object-fit: cover; }
+            .object-contain { object-fit: contain; }
+
+            .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); }
+            .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+            .backdrop-blur-sm { backdrop-filter: blur(4px); }
+
+            img {
+              max-width: 100%;
+              height: auto;
+            }
+
+            @media print {
+              body {
+                padding: 0;
+                background: #ffffff;
               }
-            } else {
-              target.style.setProperty(prop, value)
+              .ticket-container {
+                box-shadow: none;
+                max-width: 100%;
+              }
             }
-          }
-        })
-      }
+          </style>
+        </head>
+        <body>
+          <div class="ticket-container">
+            ${htmlContent}
+          </div>
+          <script>
+            // Auto-print when loaded
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+              }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `)
 
-      // Deep clone with computed styles
-      const cloneWithStyles = (element: Element): HTMLElement => {
-        const clone = element.cloneNode(false) as HTMLElement
-        if (element instanceof HTMLElement) {
-          copyComputedStyles(element, clone)
-        }
-
-        // Handle images specially
-        if (element instanceof HTMLImageElement && clone instanceof HTMLImageElement) {
-          clone.src = element.src
-          clone.style.width = element.offsetWidth + 'px'
-          clone.style.height = element.offsetHeight + 'px'
-          clone.style.objectFit = 'cover'
-        }
-
-        // Recursively clone children
-        Array.from(element.children).forEach(child => {
-          clone.appendChild(cloneWithStyles(child))
-        })
-
-        // Copy text content for text nodes
-        if (element.childNodes.length > 0) {
-          Array.from(element.childNodes).forEach(node => {
-            if (node.nodeType === Node.TEXT_NODE && node.textContent?.trim()) {
-              clone.appendChild(document.createTextNode(node.textContent))
-            }
-          })
-        }
-
-        return clone
-      }
-
-      // Create styled clone
-      const styledClone = cloneWithStyles(ticketElement)
-      styledClone.style.width = '400px'
-      styledClone.style.backgroundColor = '#ffffff'
-      styledClone.style.borderRadius = '16px'
-      styledClone.style.overflow = 'hidden'
-      styledClone.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)'
-
-      // Create container for capture
-      const container = document.createElement('div')
-      container.style.cssText = 'position: fixed; left: -9999px; top: 0; background: #ffffff; padding: 0;'
-      container.appendChild(styledClone)
-      document.body.appendChild(container)
-
-      // Wait for images in clone
-      const clonedImages = styledClone.querySelectorAll('img')
-      await Promise.all(
-        Array.from(clonedImages).map((img) => {
-          if (img.complete) return Promise.resolve()
-          return new Promise((resolve) => {
-            img.onload = resolve
-            img.onerror = resolve
-          })
-        })
-      )
-
-      // Small delay for rendering
-      await new Promise(resolve => setTimeout(resolve, 200))
-
-      // Capture with html2canvas
-      const canvas = await html2canvas(styledClone, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        logging: false,
-      })
-
-      // Clean up
-      document.body.removeChild(container)
-
-      // Calculate PDF dimensions based on canvas aspect ratio
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-
-      // A4 dimensions in mm
-      const pdfWidth = 210
-      const pdfHeight = 297
-
-      // Calculate scale to fit width with padding
-      const padding = 20
-      const maxWidth = pdfWidth - (padding * 2)
-      const scale = maxWidth / imgWidth
-      const scaledHeight = imgHeight * scale
-
-      // Create PDF
-      const pdf = new jsPDF({
-        orientation: scaledHeight > pdfHeight - (padding * 2) ? 'portrait' : 'portrait',
-        unit: 'mm',
-        format: 'a4',
-      })
-
-      // Add the image centered on the page
-      const xOffset = padding
-      const yOffset = padding
-
-      pdf.addImage(
-        canvas.toDataURL('image/png'),
-        'PNG',
-        xOffset,
-        yOffset,
-        maxWidth,
-        scaledHeight
-      )
-
-      // If the content is taller than one page, we might need multiple pages
-      // For now, we'll scale it to fit one page
-
-      // Download the PDF
-      pdf.save(`${quote.quote_number}.pdf`)
+      printWindow.document.close()
 
       toast({
-        title: 'Success',
-        description: 'PDF downloaded successfully',
+        title: 'Print Dialog Opened',
+        description: 'Select "Save as PDF" in the print dialog to download your quote.',
       })
     } catch (error) {
       console.error('Error generating PDF:', error)
       toast({
         title: 'Error',
-        description: 'Failed to generate PDF. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to generate PDF. Please try again.',
         variant: 'destructive',
       })
     } finally {
