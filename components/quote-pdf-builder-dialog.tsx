@@ -30,6 +30,8 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { formatCurrency } from '@/lib/utils'
+import html2canvas from 'html2canvas'
+import { jsPDF } from 'jspdf'
 
 interface QuotePDFBuilderDialogProps {
   quote: QuoteWithItems
@@ -51,9 +53,11 @@ export function QuotePDFBuilderDialog({
   const router = useRouter()
   const { toast } = useToast()
   const [isSaving, setIsSaving] = useState(false)
+  const [isDownloading, setIsDownloading] = useState(false)
   const [activeTab, setActiveTab] = useState('settings')
   const [uploadingServiceId, setUploadingServiceId] = useState<string | null>(null)
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({})
+  const previewRef = useRef<HTMLDivElement>(null)
 
   // Header customization
   const [headerTitle, setHeaderTitle] = useState('')
@@ -162,6 +166,113 @@ export function QuotePDFBuilderDialog({
       title: 'Reset',
       description: 'Customization reset to defaults',
     })
+  }
+
+  const handleDownloadPDF = async () => {
+    if (!previewRef.current) {
+      toast({
+        title: 'Error',
+        description: 'Preview not available. Please switch to Preview tab first.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsDownloading(true)
+
+    try {
+      // Switch to preview tab if not already there
+      if (activeTab !== 'preview') {
+        setActiveTab('preview')
+        // Wait for the tab to switch and render
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+
+      // Find the actual ticket preview element inside the preview container
+      const ticketElement = previewRef.current.querySelector('.max-w-\\[400px\\]') as HTMLElement
+
+      if (!ticketElement) {
+        throw new Error('Could not find ticket preview element')
+      }
+
+      // Wait for images to load
+      const images = ticketElement.querySelectorAll('img')
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve()
+          return new Promise((resolve) => {
+            img.onload = resolve
+            img.onerror = resolve
+          })
+        })
+      )
+
+      // Small delay to ensure full render
+      await new Promise(resolve => setTimeout(resolve, 300))
+
+      // Capture the ticket element with html2canvas
+      const canvas = await html2canvas(ticketElement, {
+        scale: 2, // Higher quality
+        useCORS: true, // Allow cross-origin images
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      })
+
+      // Calculate PDF dimensions based on canvas aspect ratio
+      const imgWidth = canvas.width
+      const imgHeight = canvas.height
+
+      // A4 dimensions in mm
+      const pdfWidth = 210
+      const pdfHeight = 297
+
+      // Calculate scale to fit width with padding
+      const padding = 20
+      const maxWidth = pdfWidth - (padding * 2)
+      const scale = maxWidth / imgWidth
+      const scaledHeight = imgHeight * scale
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: scaledHeight > pdfHeight - (padding * 2) ? 'portrait' : 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      // Add the image centered on the page
+      const xOffset = padding
+      const yOffset = padding
+
+      pdf.addImage(
+        canvas.toDataURL('image/png'),
+        'PNG',
+        xOffset,
+        yOffset,
+        maxWidth,
+        scaledHeight
+      )
+
+      // If the content is taller than one page, we might need multiple pages
+      // For now, we'll scale it to fit one page
+
+      // Download the PDF
+      pdf.save(`${quote.quote_number}.pdf`)
+
+      toast({
+        title: 'Success',
+        description: 'PDF downloaded successfully',
+      })
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to generate PDF. Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsDownloading(false)
+    }
   }
 
   const updateServiceOverride = (serviceId: string, field: keyof ServiceOverrideState, value: any) => {
@@ -744,7 +855,7 @@ export function QuotePDFBuilderDialog({
 
           <TabsContent value="preview" className="mt-0 flex-1 min-h-0 px-6 py-4">
             <div className="h-full rounded-xl overflow-hidden border border-white/20 bg-white">
-              <div className="h-full overflow-y-auto p-6" style={{ backgroundColor: '#f8f8f8' }}>
+              <div ref={previewRef} className="h-full overflow-y-auto p-6" style={{ backgroundColor: '#f8f8f8' }}>
                 {/* PDF Preview - Ticket Style */}
                 <div className="max-w-[400px] mx-auto bg-white rounded-2xl shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
                   {/* Top Header with Logo */}
@@ -921,6 +1032,25 @@ export function QuotePDFBuilderDialog({
               className="border-white/30 hover:bg-white/10 text-white"
             >
               Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className="border-white/30 hover:bg-white/10 text-white"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </>
+              )}
             </Button>
             <Button
               type="button"

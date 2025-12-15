@@ -49,8 +49,6 @@ import {
 import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
 import { QuotePDFBuilderDialog } from './quote-pdf-builder-dialog'
-import { pdf } from '@react-pdf/renderer'
-import { QuotePDFBuilder } from './quote-pdf-builder'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-300 border-gray-500/30', icon: FileText },
@@ -136,44 +134,8 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   }
 
   const handleDownloadPDF = async (quote: Quote) => {
-    try {
-      // Fetch full quote data with service items
-      const response = await fetch(`/api/quote-data/${quote.id}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch quote data')
-      }
-      const quoteWithItems: QuoteWithItems = await response.json()
-
-      // Generate PDF client-side using the QuotePDFBuilder component
-      const blob = await pdf(
-        <QuotePDFBuilder
-          quote={quoteWithItems}
-          customization={quoteWithItems.pdf_customization}
-        />
-      ).toBlob()
-
-      // Download the PDF
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${quote.quote_number}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
-
-      toast({
-        title: 'PDF Downloaded',
-        description: `Quote ${quote.quote_number} has been downloaded.`,
-      })
-    } catch (error) {
-      console.error('PDF generation error:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to generate PDF. Please try again.',
-        variant: 'destructive',
-      })
-    }
+    // Open the PDF Builder dialog which has the proper html2canvas download
+    await handleOpenPdfBuilder(quote)
   }
 
   const handleOpenPdfBuilder = async (quote: Quote) => {
