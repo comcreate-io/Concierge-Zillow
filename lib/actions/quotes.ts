@@ -659,44 +659,43 @@ export async function emailQuotePDF(quoteId: string) {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #2d3748; margin: 0; padding: 0; background-color: #f7fafc; }
-            .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
-            .header { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 50px 40px; text-align: center; }
-            .logo { font-size: 32px; font-weight: 800; letter-spacing: 4px; margin-bottom: 8px; color: #ffffff; }
-            .tagline { font-size: 13px; letter-spacing: 5px; color: #d4af37; text-transform: uppercase; font-weight: 600; }
-            .badge { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 700; letter-spacing: 2px; margin-top: 20px; text-transform: uppercase; }
-            .content { background: #ffffff; padding: 45px 40px; }
-            .greeting { font-size: 16px; color: #2d3748; margin-bottom: 24px; }
-            .quote-info { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 24px; border-radius: 12px; margin: 30px 0; border: 1px solid #e2e8f0; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #ffffff; margin: 0; padding: 0; background-color: #000000; }
+            .container { max-width: 600px; margin: 0 auto; background-color: #0a0a0a; }
+            .header { background: linear-gradient(135deg, #000000 0%, #0a0a0a 100%); color: white; padding: 50px 40px; text-align: center; border-bottom: 1px solid #1f1f1f; }
+            .logo { font-size: 32px; font-weight: 800; letter-spacing: 6px; margin-bottom: 8px; color: #ffffff; text-transform: uppercase; }
+            .tagline { font-size: 13px; letter-spacing: 5px; color: #d9d9d9; text-transform: uppercase; font-weight: 600; }
+            .badge { display: inline-block; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); color: #000000; padding: 10px 24px; border-radius: 6px; font-size: 13px; font-weight: 700; letter-spacing: 2px; margin-top: 20px; text-transform: uppercase; }
+            .content { background: #0a0a0a; padding: 45px 40px; }
+            .greeting { font-size: 16px; color: #ffffff; margin-bottom: 24px; }
+            .greeting strong { color: #ffffff; }
+            .quote-info { background: linear-gradient(135deg, #0F1D33 0%, #081421 100%); padding: 24px; border-radius: 12px; margin: 30px 0; border: 1px solid #1f1f1f; }
             .info-grid { display: table; width: 100%; }
             .info-item { display: table-cell; vertical-align: top; padding: 8px 0; }
             .info-item.right { text-align: right; }
-            .info-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #718096; margin-bottom: 4px; }
-            .info-value { font-size: 16px; font-weight: 600; color: #2d3748; }
-            .info-value.accent { color: #d4af37; }
-            .section-title { font-size: 18px; font-weight: 700; color: #2d3748; margin: 35px 0 20px 0; padding-bottom: 12px; border-bottom: 3px solid #d4af37; }
+            .info-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: #b3b3b3; margin-bottom: 4px; }
+            .info-value { font-size: 16px; font-weight: 600; color: #ffffff; }
+            .info-value.accent { color: #ffffff; }
+            .section-title { font-size: 18px; font-weight: 700; color: #ffffff; margin: 35px 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #ffffff; }
             table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            tr { border-bottom: 1px solid #e2e8f0; }
+            tr { border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
             td { padding: 20px 0; vertical-align: top; }
-            .service-name { font-size: 16px; font-weight: 600; color: #2d3748; margin-bottom: 4px; }
-            .service-desc { font-size: 14px; color: #718096; line-height: 1.5; }
-            .service-price { font-size: 18px; font-weight: 700; color: #2d3748; text-align: right; white-space: nowrap; }
-            .total-box { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 35px; border-radius: 12px; margin: 35px 0; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.15); }
-            .total-label { font-size: 13px; letter-spacing: 3px; color: #d4af37; text-transform: uppercase; font-weight: 700; margin-bottom: 16px; }
+            .service-name { font-size: 16px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+            .service-desc { font-size: 14px; color: #b3b3b3; line-height: 1.5; }
+            .service-price { font-size: 18px; font-weight: 700; color: #ffffff; text-align: right; white-space: nowrap; }
+            .total-box { background: linear-gradient(135deg, #0F1D33 0%, #081421 100%); color: white; padding: 35px; border-radius: 12px; margin: 35px 0; text-align: center; border: 1px solid #1f1f1f; }
+            .total-label { font-size: 13px; letter-spacing: 3px; color: #b3b3b3; text-transform: uppercase; font-weight: 700; margin-bottom: 16px; }
             .total-value { font-size: 42px; font-weight: 800; color: #ffffff; letter-spacing: 1px; }
-            .notes-box { background: #fffbeb; padding: 20px 24px; border-left: 4px solid #d4af37; border-radius: 6px; margin: 25px 0; }
-            .notes-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #d4af37; margin-bottom: 8px; }
-            .notes-text { font-size: 14px; color: #6b7280; line-height: 1.6; margin: 0; }
+            .notes-box { background: rgba(15, 29, 51, 0.5); padding: 20px 24px; border-left: 4px solid #ffffff; border-radius: 6px; margin: 25px 0; }
+            .notes-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: #d9d9d9; margin-bottom: 8px; }
+            .notes-text { font-size: 14px; color: #b3b3b3; line-height: 1.6; margin: 0; }
             .cta-container { text-align: center; margin: 40px 0; padding: 0 20px; }
-            .cta-button { display: inline-block; background: linear-gradient(135deg, #d4af37 0%, #c9a227 100%); color: #1a202c !important; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; letter-spacing: 1.5px; margin: 8px 6px; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3); transition: all 0.3s; }
-            .cta-button:hover { box-shadow: 0 6px 16px rgba(212, 175, 55, 0.4); transform: translateY(-1px); }
-            .cta-secondary { background: transparent; border: 2px solid #2d3748; color: #2d3748 !important; box-shadow: none; }
-            .cta-secondary:hover { background: #f7fafc; }
-            .info-text { font-size: 14px; color: #718096; line-height: 1.7; margin: 25px 0; }
-            .closing { margin-top: 40px; font-size: 15px; color: #2d3748; }
-            .footer { background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%); padding: 30px 40px; text-align: center; border-top: 1px solid #e2e8f0; }
-            .footer-text { font-size: 13px; color: #718096; line-height: 1.8; }
-            .footer-brand { font-weight: 700; color: #2d3748; font-size: 14px; margin-bottom: 4px; }
+            .cta-button { display: inline-block; background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); color: #000000 !important; padding: 16px 40px; border-radius: 8px; text-decoration: none; font-weight: 700; letter-spacing: 1.5px; margin: 8px 6px; font-size: 14px; text-transform: uppercase; box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2); transition: all 0.3s; }
+            .info-text { font-size: 14px; color: #b3b3b3; line-height: 1.7; margin: 25px 0; }
+            .info-text strong { color: #ffffff; }
+            .closing { margin-top: 40px; font-size: 15px; color: #ffffff; }
+            .footer { background: #000000; padding: 30px 40px; text-align: center; border-top: 1px solid #1f1f1f; }
+            .footer-text { font-size: 13px; color: #b3b3b3; line-height: 1.8; }
+            .footer-brand { font-weight: 700; color: #ffffff; font-size: 14px; margin-bottom: 4px; letter-spacing: 2px; }
             @media only screen and (max-width: 600px) {
               .content, .footer { padding: 30px 20px !important; }
               .header { padding: 40px 20px !important; }
