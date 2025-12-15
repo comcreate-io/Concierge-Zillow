@@ -210,60 +210,82 @@ export function QuotePDFBuilderDialog({
       // Small delay to ensure full render
       await new Promise(resolve => setTimeout(resolve, 300))
 
-      // Capture the element with html2canvas, removing problematic stylesheets
-      const canvas = await html2canvas(ticketElement, {
-        scale: 2, // Higher quality
-        useCORS: true, // Allow cross-origin images
+      // Create an isolated iframe to avoid oklch color parsing issues
+      const iframe = document.createElement('iframe')
+      iframe.style.cssText = 'position: fixed; left: -9999px; top: 0; width: 500px; height: 2000px; border: none;'
+      document.body.appendChild(iframe)
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+      if (!iframeDoc) {
+        throw new Error('Could not access iframe document')
+      }
+
+      // Add clean styles to iframe (no oklch colors)
+      iframeDoc.head.innerHTML = `
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Inter, system-ui, -apple-system, sans-serif;
+          }
+          .bg-white { background-color: #ffffff; }
+          .bg-gray-900 { background-color: #111827; }
+          .bg-gray-100 { background-color: #f3f4f6; }
+          .border-gray-100 { border-color: #f3f4f6; }
+          .border-gray-200 { border-color: #e5e7eb; }
+          .text-white { color: #ffffff; }
+          .text-gray-900 { color: #111827; }
+          .text-gray-700 { color: #374151; }
+          .text-gray-500 { color: #6b7280; }
+          .text-gray-400 { color: #9ca3af; }
+          .text-gray-300 { color: #d1d5db; }
+          .text-blue-500 { color: #3b82f6; }
+          .rounded-2xl { border-radius: 1rem; }
+          .rounded-full { border-radius: 9999px; }
+          .rounded-lg { border-radius: 0.5rem; }
+          .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+          .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); }
+          .overflow-hidden { overflow: hidden; }
+          .object-cover { object-fit: cover; }
+          img { max-width: 100%; height: auto; }
+        </style>
+      `
+
+      // Clone and append content to iframe
+      const clonedContent = ticketElement.cloneNode(true) as HTMLElement
+      clonedContent.style.backgroundColor = '#ffffff'
+      iframeDoc.body.appendChild(clonedContent)
+      iframeDoc.body.style.backgroundColor = '#ffffff'
+
+      // Wait for images to load in iframe
+      const iframeImages = iframeDoc.querySelectorAll('img')
+      await Promise.all(
+        Array.from(iframeImages).map((img) => {
+          if (img.complete) return Promise.resolve()
+          return new Promise((resolve) => {
+            img.onload = resolve
+            img.onerror = resolve
+          })
+        })
+      )
+
+      // Small delay for rendering
+      await new Promise(resolve => setTimeout(resolve, 200))
+
+      // Capture from iframe
+      const canvas = await html2canvas(clonedContent, {
+        scale: 2,
+        useCORS: true,
         allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
-        onclone: (clonedDoc) => {
-          // Remove all stylesheets that contain oklch to avoid parsing errors
-          const stylesheets = clonedDoc.querySelectorAll('style, link[rel="stylesheet"]')
-          stylesheets.forEach((sheet) => {
-            if (sheet instanceof HTMLStyleElement && sheet.textContent?.includes('oklch')) {
-              sheet.remove()
-            } else if (sheet instanceof HTMLLinkElement) {
-              // Remove external stylesheets that might contain oklch
-              sheet.remove()
-            }
-          })
-
-          // Add clean styles for the PDF
-          const cleanStyle = clonedDoc.createElement('style')
-          cleanStyle.textContent = `
-            * {
-              font-family: Inter, system-ui, -apple-system, sans-serif !important;
-            }
-            .bg-white { background-color: #ffffff !important; }
-            .bg-gray-900 { background-color: #111827 !important; }
-            .bg-gray-100 { background-color: #f3f4f6 !important; }
-            .bg-black\\/60 { background-color: rgba(0,0,0,0.6) !important; }
-            .bg-white\\/95 { background-color: rgba(255,255,255,0.95) !important; }
-            .text-white { color: #ffffff !important; }
-            .text-white\\/60 { color: rgba(255,255,255,0.6) !important; }
-            .text-white\\/50 { color: rgba(255,255,255,0.5) !important; }
-            .text-white\\/70 { color: rgba(255,255,255,0.7) !important; }
-            .text-gray-900 { color: #111827 !important; }
-            .text-gray-700 { color: #374151 !important; }
-            .text-gray-500 { color: #6b7280 !important; }
-            .text-gray-400 { color: #9ca3af !important; }
-            .text-gray-300 { color: #d1d5db !important; }
-            .text-blue-500 { color: #3b82f6 !important; }
-            .border-gray-100 { border-color: #f3f4f6 !important; }
-            .border-gray-200 { border-color: #e5e7eb !important; }
-            .rounded-2xl { border-radius: 1rem !important; }
-            .rounded-full { border-radius: 9999px !important; }
-            .rounded-lg { border-radius: 0.5rem !important; }
-            .shadow-lg { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1) !important; }
-            .shadow { box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1) !important; }
-            .overflow-hidden { overflow: hidden !important; }
-            .object-cover { object-fit: cover !important; }
-            .backdrop-blur-sm { backdrop-filter: none !important; }
-          `
-          clonedDoc.head.appendChild(cleanStyle)
-        }
+        windowWidth: 500,
+        windowHeight: 2000,
       })
+
+      // Clean up iframe
+      document.body.removeChild(iframe)
 
       // Calculate PDF dimensions based on canvas aspect ratio
       const imgWidth = canvas.width
@@ -925,9 +947,9 @@ export function QuotePDFBuilderDialog({
                   {/* Title Header */}
                   <div className="bg-white p-4 text-center border-b border-gray-100">
                     <h1 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-                      {headerIcon === 'plane' && <Plane className="h-5 w-5" />}
-                      {headerIcon === 'car' && <Car className="h-5 w-5" />}
-                      {headerIcon === 'yacht' && <Ship className="h-5 w-5" />}
+                      {headerIcon === 'plane' && <span>✈️</span>}
+                      {headerIcon === 'car' && <span>🚗</span>}
+                      {headerIcon === 'yacht' && <span>🛥️</span>}
                       {headerTitle || 'Private Quotes'}
                     </h1>
                     {headerSubtitle && (
