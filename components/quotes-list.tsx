@@ -49,6 +49,8 @@ import {
 import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
 import { QuotePDFBuilderDialog } from './quote-pdf-builder-dialog'
+import { pdf } from '@react-pdf/renderer'
+import { QuotePDFBuilder } from './quote-pdf-builder'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
   draft: { label: 'Draft', color: 'bg-gray-500/20 text-gray-300 border-gray-500/30', icon: FileText },
@@ -135,13 +137,22 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
 
   const handleDownloadPDF = async (quote: Quote) => {
     try {
-      // Use the new server-side PDF generation
-      const response = await fetch(`/api/quotes/${quote.id}/pdf`)
+      // Fetch full quote data with service items
+      const response = await fetch(`/api/quote-data/${quote.id}`)
       if (!response.ok) {
-        throw new Error('Failed to generate PDF')
+        throw new Error('Failed to fetch quote data')
       }
+      const quoteWithItems: QuoteWithItems = await response.json()
 
-      const blob = await response.blob()
+      // Generate PDF client-side using the QuotePDFBuilder component
+      const blob = await pdf(
+        <QuotePDFBuilder
+          quote={quoteWithItems}
+          customization={quoteWithItems.pdf_customization}
+        />
+      ).toBlob()
+
+      // Download the PDF
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
