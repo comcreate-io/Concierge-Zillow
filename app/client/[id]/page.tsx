@@ -112,37 +112,37 @@ export default async function ClientPublicPage({
       </header>
 
       {/* Manager Contact Info */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
-        {manager && (
-          <Card className="mb-10 glass-card premium-card diagonal-split animate-fade-in">
-            <CardContent className="p-8 sm:p-10">
-              <h2 className="luxury-heading text-2xl font-semibold mb-6 text-white tracking-[0.2em]">Contact Information</h2>
-              <div className="grid gap-6 md:grid-cols-2">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-12">
+        {manager && (manager.email || manager.phone) && (
+          <Card className="mb-6 sm:mb-10 glass-card animate-fade-in">
+            <CardContent className="p-5 sm:p-8">
+              <h2 className="luxury-heading text-xl sm:text-2xl font-semibold mb-4 sm:mb-6 text-white tracking-[0.15em] sm:tracking-[0.2em]">Contact Information</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
                 {manager.email && (
-                  <div className="flex items-center gap-4 group">
-                    <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
-                      <Mail className="h-6 w-6 text-white/90" />
+                  <a href={`mailto:${manager.email}`} className="flex items-center gap-3 group">
+                    <div className="p-2.5 sm:p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
+                      <Mail className="h-5 w-5 sm:h-6 sm:w-6 text-white/90" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Email</p>
-                      <a href={`mailto:${manager.email}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
+                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-0.5">Email</p>
+                      <span className="text-white text-sm sm:text-base hover:text-white/90 transition-colors font-medium">
                         {manager.email}
-                      </a>
+                      </span>
                     </div>
-                  </div>
+                  </a>
                 )}
                 {manager.phone && (
-                  <div className="flex items-center gap-4 group">
-                    <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
-                      <Phone className="h-6 w-6 text-white/90" />
+                  <a href={`tel:${manager.phone}`} className="flex items-center gap-3 group">
+                    <div className="p-2.5 sm:p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
+                      <Phone className="h-5 w-5 sm:h-6 sm:w-6 text-white/90" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Phone</p>
-                      <a href={`tel:${manager.phone}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
+                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-0.5">Phone</p>
+                      <span className="text-white text-sm sm:text-base hover:text-white/90 transition-colors font-medium">
                         {formatPhoneNumber(manager.phone)}
-                      </a>
+                      </span>
                     </div>
-                  </div>
+                  </a>
                 )}
               </div>
             </CardContent>
