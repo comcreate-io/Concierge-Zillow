@@ -111,10 +111,10 @@ export default function PropertyListingPage() {
             showPurchasePrice = showPurchasePrice && (assignment.show_purchase_price_to_client ?? true)
           }
 
-          // Fetch the client's manager
+          // Fetch the client's manager (explicitly include phone)
           const { data: clientData } = await supabase
             .from('clients')
-            .select('property_managers(*)')
+            .select('property_managers(id, name, email, phone, profile_picture_url)')
             .eq('id', clientId)
             .single()
 
