@@ -40,12 +40,7 @@ export default async function ClientPublicPage({
   // Track that the client accessed their page (async, don't await)
   trackClientAccess(client.id)
 
-  const manager = client.property_managers as any
-
-  // If no manager is associated, return not found
-  if (!manager) {
-    notFound()
-  }
+  const manager = client.property_managers as any | null
 
   // Fetch properties assigned to this client (with client-specific pricing visibility)
   const { data: assignments, error: assignmentsError } = await supabase
@@ -102,9 +97,11 @@ export default async function ClientPublicPage({
                 <h1 className="luxury-heading text-3xl sm:text-4xl font-bold text-white tracking-[0.2em] mb-2">
                   {client.name}'s Properties
                 </h1>
-                <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">
-                  Curated by {manager.name}
-                </p>
+                {manager?.name && (
+                  <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">
+                    Curated by {manager.name}
+                  </p>
+                )}
               </div>
               <Badge variant="secondary" className="bg-white/15 text-white border-white/30 backdrop-blur-md text-base sm:text-xl px-5 sm:px-6 py-2 sm:py-3 shadow-lg">
                 {propertyList.length} {propertyList.length === 1 ? 'Property' : 'Properties'}
@@ -116,37 +113,41 @@ export default async function ClientPublicPage({
 
       {/* Manager Contact Info */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 sm:py-12">
-        <Card className="mb-10 glass-card premium-card diagonal-split animate-fade-in">
-          <CardContent className="p-8 sm:p-10">
-            <h2 className="luxury-heading text-2xl font-semibold mb-6 text-white tracking-[0.2em]">Contact Information</h2>
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="flex items-center gap-4 group">
-                <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
-                  <Mail className="h-6 w-6 text-white/90" />
-                </div>
-                <div>
-                  <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Email</p>
-                  <a href={`mailto:${manager.email}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
-                    {manager.email}
-                  </a>
-                </div>
+        {manager && (
+          <Card className="mb-10 glass-card premium-card diagonal-split animate-fade-in">
+            <CardContent className="p-8 sm:p-10">
+              <h2 className="luxury-heading text-2xl font-semibold mb-6 text-white tracking-[0.2em]">Contact Information</h2>
+              <div className="grid gap-6 md:grid-cols-2">
+                {manager.email && (
+                  <div className="flex items-center gap-4 group">
+                    <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
+                      <Mail className="h-6 w-6 text-white/90" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Email</p>
+                      <a href={`mailto:${manager.email}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
+                        {manager.email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {manager.phone && (
+                  <div className="flex items-center gap-4 group">
+                    <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
+                      <Phone className="h-6 w-6 text-white/90" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Phone</p>
+                      <a href={`tel:${manager.phone}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
+                        {formatPhoneNumber(manager.phone)}
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
-              {manager.phone && (
-                <div className="flex items-center gap-4 group">
-                  <div className="p-3 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 group-hover:bg-white/15 transition-all">
-                    <Phone className="h-6 w-6 text-white/90" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-white/70 uppercase tracking-[0.15em] mb-1">Phone</p>
-                    <a href={`tel:${manager.phone}`} className="text-white text-base hover:text-white/90 transition-colors font-medium">
-                      {formatPhoneNumber(manager.phone)}
-                    </a>
-                  </div>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Properties List */}
         {propertyList.length === 0 ? (
@@ -171,32 +172,38 @@ export default async function ClientPublicPage({
         )}
 
         {/* Contact Form Section */}
-        <div className="mt-16 sm:mt-20">
-          <h2 className="luxury-heading text-3xl font-bold mb-8 text-white tracking-[0.2em] text-center">
-            Get in Touch
-          </h2>
-          <ManagerContactForm manager={manager} />
-        </div>
+        {manager && (
+          <div className="mt-16 sm:mt-20">
+            <h2 className="luxury-heading text-3xl font-bold mb-8 text-white tracking-[0.2em] text-center">
+              Get in Touch
+            </h2>
+            <ManagerContactForm manager={manager} />
+          </div>
+        )}
       </div>
 
       {/* Footer */}
       <footer className="mt-20 border-t border-white/10 backdrop-blur-md bg-black/20 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 text-center text-white/80">
-          <p className="luxury-heading tracking-[0.2em] text-base mb-4">Curated by {manager.name}</p>
-          <p className="text-base tracking-wide leading-relaxed">
-            For inquiries, contact{' '}
-            <a href={`mailto:${manager.email}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
-              {manager.email}
-            </a>
-            {manager.phone && (
-              <>
-                {' '}or call{' '}
-                <a href={`tel:${manager.phone}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
-                  {formatPhoneNumber(manager.phone)}
-                </a>
-              </>
-            )}
-          </p>
+          {manager?.name && (
+            <p className="luxury-heading tracking-[0.2em] text-base mb-4">Curated by {manager.name}</p>
+          )}
+          {manager?.email && (
+            <p className="text-base tracking-wide leading-relaxed">
+              For inquiries, contact{' '}
+              <a href={`mailto:${manager.email}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
+                {manager.email}
+              </a>
+              {manager.phone && (
+                <>
+                  {' '}or call{' '}
+                  <a href={`tel:${manager.phone}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
+                    {formatPhoneNumber(manager.phone)}
+                  </a>
+                </>
+              )}
+            </p>
+          )}
         </div>
       </footer>
     </div>
