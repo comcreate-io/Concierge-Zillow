@@ -423,7 +423,7 @@ export async function assignPropertyToClient(
     .order('position', { ascending: false })
     .limit(1)
 
-  const nextPosition = currentAssignments && currentAssignments[0]?.position !== null
+  const nextPosition = currentAssignments && currentAssignments.length > 0 && currentAssignments[0].position !== null
     ? currentAssignments[0].position + 1
     : 0
 
