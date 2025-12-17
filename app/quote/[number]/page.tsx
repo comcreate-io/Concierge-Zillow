@@ -126,26 +126,44 @@ export default function QuoteViewPage() {
 
   // Helper function to convert oklch/oklab colors to hex
   const convertToHex = (color: string): string => {
+    if (!color) return '#000000'
     if (color.startsWith('#')) return color
     if (color.includes('oklch') || color.includes('oklab')) {
+      // Map common oklch/oklab values to hex equivalents
+      // Whites and near-whites
       if (color.includes('0.985') || color.includes('0.99') || color.includes('0.98')) return '#ffffff'
-      if (color.includes('0.129') || color.includes('0.13') || color.includes('0.14')) return '#111827'
       if (color.includes('0.967') || color.includes('0.97') || color.includes('0.96')) return '#f3f4f6'
-      if (color.includes('0.21') || color.includes('0.22') || color.includes('0.20')) return '#1f2937'
-      if (color.includes('0.37') || color.includes('0.38') || color.includes('0.36')) return '#374151'
-      if (color.includes('0.446') || color.includes('0.45') || color.includes('0.44')) return '#4b5563'
-      if (color.includes('0.556') || color.includes('0.55') || color.includes('0.56') || color.includes('0.54')) return '#6b7280'
-      if (color.includes('0.704') || color.includes('0.70') || color.includes('0.71')) return '#9ca3af'
-      if (color.includes('0.872') || color.includes('0.87') || color.includes('0.86')) return '#d1d5db'
       if (color.includes('0.928') || color.includes('0.93') || color.includes('0.92')) return '#e5e7eb'
+      // Grays
+      if (color.includes('0.872') || color.includes('0.87') || color.includes('0.86')) return '#d1d5db'
+      if (color.includes('0.704') || color.includes('0.70') || color.includes('0.71')) return '#9ca3af'
+      if (color.includes('0.556') || color.includes('0.55') || color.includes('0.56') || color.includes('0.54')) return '#6b7280'
+      if (color.includes('0.446') || color.includes('0.45') || color.includes('0.44')) return '#4b5563'
+      if (color.includes('0.37') || color.includes('0.38') || color.includes('0.36')) return '#374151'
+      if (color.includes('0.21') || color.includes('0.22') || color.includes('0.20')) return '#1f2937'
+      if (color.includes('0.129') || color.includes('0.13') || color.includes('0.14') || color.includes('0.15')) return '#111827'
+      // Blues
       if (color.includes('0.588') && color.includes('250')) return '#3b82f6'
-      const match = color.match(/[\d.]+/)
+      if (color.includes('0.59') || color.includes('0.58')) return '#3b82f6'
+      // Greens (for car mode indicators)
+      if (color.includes('142') || color.includes('145') || color.includes('140')) return '#22c55e' // green-500
+      if (color.includes('0.64') && color.includes('14')) return '#22c55e' // green-500
+      if (color.includes('0.72') && color.includes('14')) return '#4ade80' // green-400
+      // Reds
+      if (color.includes('0.63') && color.includes('25')) return '#ef4444' // red-500
+      if (color.includes('0.50') && color.includes('25')) return '#dc2626' // red-600
+      // Default fallbacks based on lightness
+      const match = color.match(/oklch\s*\(\s*([\d.]+)/)
       if (match) {
-        const lightness = parseFloat(match[0])
+        const lightness = parseFloat(match[1])
         if (lightness > 0.9) return '#ffffff'
+        if (lightness > 0.8) return '#e5e7eb'
         if (lightness > 0.7) return '#d1d5db'
+        if (lightness > 0.6) return '#9ca3af'
         if (lightness > 0.5) return '#6b7280'
+        if (lightness > 0.4) return '#4b5563'
         if (lightness > 0.3) return '#374151'
+        if (lightness > 0.2) return '#1f2937'
         return '#111827'
       }
       return '#000000'
@@ -287,6 +305,17 @@ export default function QuoteViewPage() {
         }
       })
 
+      // Fix text alignment in boarding pass and card sections for html2canvas
+      // Move ALL text elements up by 4px for proper PDF rendering
+      const allTextElements = ticketElement.querySelectorAll('p, span')
+      allTextElements.forEach((el) => {
+        if (el instanceof HTMLElement) {
+          originalStyles.set(el, el.style.cssText)
+          el.style.position = 'relative'
+          el.style.top = '-4px'
+        }
+      })
+
       // Capture with html2canvas
       const canvas = await html2canvas(ticketElement, {
         backgroundColor: '#ffffff',
@@ -295,6 +324,24 @@ export default function QuoteViewPage() {
         allowTaint: true,
         logging: false,
         imageTimeout: 15000,
+        onclone: (clonedDoc) => {
+          // Convert any remaining oklch colors in the cloned document
+          const allClonedElements = clonedDoc.querySelectorAll('*')
+          allClonedElements.forEach((el) => {
+            if (el instanceof HTMLElement) {
+              const computed = window.getComputedStyle(el)
+              if (computed.backgroundColor?.includes('oklch')) {
+                el.style.backgroundColor = convertToHex(computed.backgroundColor)
+              }
+              if (computed.color?.includes('oklch')) {
+                el.style.color = convertToHex(computed.color)
+              }
+              if (computed.borderColor?.includes('oklch')) {
+                el.style.borderColor = convertToHex(computed.borderColor)
+              }
+            }
+          })
+        },
       })
 
       // Restore original styles
@@ -737,20 +784,38 @@ export default function QuoteViewPage() {
             <p className="text-xs text-gray-500">{quote.client_email}</p>
           </div>
 
-          {/* Service Options - Ticket Style */}
+          {/* Service Options */}
           {quote.service_items.map((item) => {
             const override = quote.pdf_customization?.service_overrides?.[item.id]
             const displayImages = override?.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
             const displayName = override?.display_name || item.service_name
+            const displayDescription = override?.display_description || item.description || ''
             const details = override?.details || []
+            const headerIcon = quote.pdf_customization?.header_icon || 'plane'
 
+            // Extract details - Plane mode
             const dateDetail = details.find(d => d.label === 'Date')?.value || ''
-            const departureCode = details.find(d => d.label === 'Departure Code')?.value || 'TBD'
+            const departureCode = details.find(d => d.label === 'Departure Code')?.value || ''
             const departureDetail = details.find(d => d.label === 'Departure')?.value || ''
-            const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || 'TBD'
+            const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || ''
             const arrivalDetail = details.find(d => d.label === 'Arrival')?.value || ''
             const duration = details.find(d => d.label === 'Duration')?.value || ''
             const passengers = details.find(d => d.label === 'Passengers')?.value || ''
+
+            // Extract details - Yacht mode
+            const departureMarina = details.find(d => d.label === 'Departure Marina')?.value || ''
+            const destination = details.find(d => d.label === 'Destination')?.value || ''
+            const guests = details.find(d => d.label === 'Guests')?.value || ''
+
+            // Extract details - Car mode
+            const pickup = details.find(d => d.label === 'Pickup')?.value || ''
+            const dropoff = details.find(d => d.label === 'Dropoff')?.value || ''
+
+            // Extract details - Generic mode
+            const location = details.find(d => d.label === 'Location')?.value || ''
+
+            // Get guest/passenger count for badge
+            const guestCount = passengers || guests || ''
 
             return (
               <div key={item.id} className="bg-white border-b-8 border-gray-100">
@@ -762,7 +827,7 @@ export default function QuoteViewPage() {
                         alt="Main"
                         className="w-full h-full object-cover"
                       />
-                      <div className="absolute top-3 left-3 bg-black/40 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-lg leading-none">
+                      <div className="absolute top-3 left-3 bg-black/20 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-lg leading-none">
                         <span className="leading-none">→</span> <span className="leading-none">{displayName}</span>
                       </div>
                     </div>
@@ -774,9 +839,9 @@ export default function QuoteViewPage() {
                           alt="Interior"
                           className="w-full h-full object-cover"
                         />
-                        {passengers && (
-                          <div className="absolute top-3 right-3 bg-white/50 backdrop-blur-sm text-gray-700 text-xs px-2.5 py-1.5 rounded-full inline-flex items-center gap-1 shadow leading-none">
-                            <User className="h-3 w-3 flex-shrink-0" /> <span className="leading-none">{passengers}</span>
+                        {guestCount && (
+                          <div className="absolute top-3 right-3 bg-white/30 backdrop-blur-sm text-gray-700 text-xs px-2.5 py-1.5 rounded-full inline-flex items-center gap-1 shadow leading-none">
+                            <User className="h-3 w-3 flex-shrink-0" /> <span className="leading-none">{guestCount}</span>
                           </div>
                         )}
                       </div>
@@ -785,32 +850,182 @@ export default function QuoteViewPage() {
                 )}
 
                 <div className="p-5 bg-white">
-                  {dateDetail && (
-                    <p className="text-sm text-gray-500 mb-4">{dateDetail}</p>
+                  {/* Description - shown for non-plane modes only (plane mode shows it inside boarding pass) */}
+                  {displayDescription && headerIcon !== 'plane' && (
+                    <p className="text-xs text-gray-600 mb-4 whitespace-pre-wrap">{displayDescription}</p>
                   )}
 
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="text-left">
-                      <p className="text-2xl font-bold text-gray-900">{departureCode}</p>
-                      <p className="text-xs text-blue-500">{departureDetail}</p>
-                    </div>
+                  {/* Plane Mode - Boarding Pass Style */}
+                  {headerIcon === 'plane' && (
+                    <div className="mb-5 rounded-xl overflow-hidden shadow-sm" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
+                      {/* Boarding Pass Header */}
+                      <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: '#111827' }}>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="#ffffff" viewBox="0 0 24 24">
+                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                          </svg>
+                          <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>Boarding Pass</span>
+                        </div>
+                        {dateDetail && (
+                          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{dateDetail}</span>
+                        )}
+                      </div>
 
-                    <div className="flex-1 px-3">
-                      <div className="flex flex-col items-center">
-                        <p className="text-xs text-gray-400 mb-1">{duration || '---'}</p>
-                        <div className="flex items-center w-full">
-                          <div className="flex-1 h-px bg-gray-200"></div>
-                          <div className="mx-2 text-gray-300">→</div>
-                          <div className="flex-1 h-px bg-gray-200"></div>
+                      {/* Main Flight Route Section */}
+                      <div className="p-4" style={{ backgroundColor: '#ffffff' }}>
+                        <div className="flex items-center justify-between">
+                          {/* Departure */}
+                          <div className="text-left flex-1">
+                            <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>From</p>
+                            <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{departureCode || '---'}</p>
+                            <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{departureDetail || 'Departure'}</p>
+                          </div>
+
+                          {/* Flight Path */}
+                          <div className="flex-1 px-2">
+                            <div className="flex flex-col items-center">
+                              <p className="text-[10px] mb-2 font-medium" style={{ color: '#9ca3af' }}>{duration || '---'}</p>
+                              <div className="flex items-center w-full">
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#111827', border: '2px solid #e5e7eb' }}></div>
+                                <div className="flex-1 mx-1 relative" style={{ borderTop: '2px dashed #d1d5db' }}>
+                                  <svg className="w-5 h-5 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ backgroundColor: '#ffffff' }} fill="#374151" viewBox="0 0 24 24">
+                                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                                  </svg>
+                                </div>
+                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#9ca3af', border: '2px solid #e5e7eb' }}></div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Arrival */}
+                          <div className="text-right flex-1">
+                            <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>To</p>
+                            <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{arrivalCode || '---'}</p>
+                            <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{arrivalDetail || 'Arrival'}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Ticket Tear Line */}
+                      <div className="relative h-4">
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-r-full" style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}></div>
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-l-full" style={{ backgroundColor: '#ffffff', borderLeft: '1px solid #e5e7eb' }}></div>
+                        <div className="absolute inset-x-5 top-1/2" style={{ borderTop: '2px dashed #d1d5db' }}></div>
+                      </div>
+
+                      {/* Additional Details Grid */}
+                      <div className="p-4" style={{ backgroundColor: '#f9fafb' }}>
+                        <div className="grid grid-cols-3 gap-3">
+                          {passengers && (
+                            <div className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
+                              <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Passengers</p>
+                              <p className="text-lg font-bold" style={{ color: '#111827' }}>{passengers}</p>
+                            </div>
+                          )}
+                          {details
+                            .filter(d =>
+                              d.value &&
+                              !['Date', 'Departure Code', 'Departure', 'Arrival Code', 'Arrival', 'Duration', 'Passengers'].includes(d.label)
+                            )
+                            .map((detail, idx) => (
+                              <div key={idx} className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
+                                <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>{detail.label}</p>
+                                <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
+                              </div>
+                            ))
+                          }
+                        </div>
+                        {/* Description inside boarding pass */}
+                        {displayDescription && (
+                          <p className="text-xs mt-3 pt-3" style={{ color: '#6b7280', borderTop: '1px solid #e5e7eb' }}>{displayDescription}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Date for non-plane modes */}
+                  {headerIcon !== 'plane' && dateDetail && (
+                    <p className="text-sm mb-3" style={{ color: '#6b7280' }}>{dateDetail}</p>
+                  )}
+
+                  {/* Yacht Mode - Route Style */}
+                  {headerIcon === 'yacht' && (departureMarina || destination) && (
+                    <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#3b82f6', border: '2px solid #ffffff' }}></div>
+                          <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
+                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
+                        </div>
+                        <div className="flex-1 space-y-4">
+                          {departureMarina && (
+                            <div>
+                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Departure Marina</p>
+                              <p className="text-sm font-semibold" style={{ color: '#111827' }}>{departureMarina}</p>
+                            </div>
+                          )}
+                          {destination && (
+                            <div>
+                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Destination</p>
+                              <p className="text-sm font-semibold" style={{ color: '#111827' }}>{destination}</p>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
+                  )}
 
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-gray-900">{arrivalCode}</p>
-                      <p className="text-xs text-blue-500">{arrivalDetail}</p>
+                  {/* Car Mode - Route Style */}
+                  {headerIcon === 'car' && (pickup || dropoff) && (
+                    <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-center">
+                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#22c55e', border: '2px solid #ffffff' }}></div>
+                          <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
+                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
+                        </div>
+                        <div className="flex-1 space-y-4">
+                          {pickup && (
+                            <div>
+                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Pickup</p>
+                              <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{pickup}</p>
+                            </div>
+                          )}
+                          {dropoff && (
+                            <div>
+                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Dropoff</p>
+                              <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{dropoff}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Grid for remaining details - non-plane modes */}
+                  {headerIcon !== 'plane' && details.filter(d => {
+                    if (!d.value || d.label === 'Date') return false
+                    if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
+                    if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
+                    return true
+                  }).length > 0 && (
+                    <div className="mb-5 grid grid-cols-2 gap-2">
+                      {details
+                        .filter(d => {
+                          if (!d.value || d.label === 'Date') return false
+                          if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
+                          if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
+                          return true
+                        })
+                        .map((detail, idx) => (
+                          <div key={idx} className="rounded-lg p-3" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
+                            <p className="text-[9px] uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>{detail.label}</p>
+                            <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
+                          </div>
+                        ))
+                      }
+                    </div>
+                  )}
 
                   <div className="text-right pt-4 border-t border-gray-100">
                     <p className="text-2xl font-bold text-gray-900">
@@ -823,14 +1038,22 @@ export default function QuoteViewPage() {
             )
           })}
 
+          {/* Notes Section */}
+          {quote.notes && (
+            <div className="p-5" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e5e7eb' }}>
+              <p className="text-[10px] uppercase tracking-wider mb-2 font-medium" style={{ color: '#9ca3af' }}>Notes</p>
+              <p className="text-xs whitespace-pre-wrap" style={{ color: '#374151' }}>{quote.notes}</p>
+            </div>
+          )}
+
           {/* Footer */}
-          <div className="p-5 bg-gray-900 text-center">
-            <p className="text-sm font-bold text-white tracking-widest mb-1">CADIZ & LLUIS</p>
-            <p className="text-[10px] text-white/60 tracking-wider uppercase mb-3">Luxury Living</p>
-            <p className="text-[10px] text-white/50">
+          <div className="p-5 text-center" style={{ backgroundColor: '#111827' }}>
+            <p className="text-sm font-bold tracking-widest mb-1" style={{ color: '#ffffff' }}>CADIZ & LLUIS</p>
+            <p className="text-[10px] tracking-wider uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>Luxury Living</p>
+            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
               Quote valid until {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </p>
-            <p className="text-[10px] text-white/70 mt-1">
+            <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>
               brody@cadizlluis.com • www.cadizlluis.com
             </p>
           </div>
