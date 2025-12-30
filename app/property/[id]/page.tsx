@@ -243,7 +243,7 @@ export default function PropertyListingPage() {
           <Home className="h-16 w-16 text-white/40 mx-auto mb-4" />
           <h2 className="text-2xl text-white mb-2">Property Not Found</h2>
           <p className="text-white/70 mb-4">The property you're looking for doesn't exist</p>
-          <Link href="/">
+          <Link href={clientId ? `/client/${clientId}` : '/'}>
             <Button className="bg-white text-background hover:bg-white/90">
               Back to Properties
             </Button>
@@ -259,7 +259,7 @@ export default function PropertyListingPage() {
       <header className="border-b border-white/20 backdrop-blur-md sticky top-0 z-50 glass-card-accent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
           <div className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3 sm:gap-4 hover:opacity-80 transition-opacity flex-1 min-w-0">
+            <Link href={clientId ? `/client/${clientId}` : '/'} className="flex items-center gap-3 sm:gap-4 hover:opacity-80 transition-opacity flex-1 min-w-0">
               <div className="shimmer">
                 <Logo />
               </div>
@@ -291,7 +291,7 @@ export default function PropertyListingPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Back Button */}
         <div className="mb-6">
-          <Link href="/">
+          <Link href={clientId ? `/client/${clientId}` : '/'}>
             <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 backdrop-blur-sm -ml-2">
               <ChevronLeft className="h-4 w-4 mr-1" />
               Back to Properties

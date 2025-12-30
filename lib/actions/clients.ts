@@ -12,6 +12,7 @@ export type Client = {
   name: string
   email: string | null
   phone: string | null
+  criteria: string | null
   status: ClientStatus
   slug: string | null
   last_accessed: string | null
@@ -23,6 +24,8 @@ export type ClientWithDetails = Client & {
   property_managers?: {
     id: string
     name: string
+    last_name?: string | null
+    title?: string | null
     email: string
   }
   property_count?: number
@@ -37,8 +40,15 @@ export type ClientWithDetails = Client & {
 export type ManagerProfile = {
   id: string
   name: string
+  last_name: string | null
+  title: string | null
   email: string
   phone: string | null
+  profile_picture_url: string | null
+  instagram_url: string | null
+  facebook_url: string | null
+  linkedin_url: string | null
+  twitter_url: string | null
   auth_user_id: string | null
 }
 
@@ -250,6 +260,7 @@ export async function addClient(formData: FormData) {
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
+  const criteria = formData.get('criteria') as string
   const customSlug = formData.get('slug') as string | null
 
   // Generate slug from name or use custom slug
@@ -292,6 +303,7 @@ export async function addClient(formData: FormData) {
         name,
         email: email || null,
         phone: phone || null,
+        criteria: criteria || null,
         slug: finalSlug,
       },
     ])
@@ -314,6 +326,7 @@ export async function updateClient(formData: FormData) {
   const name = formData.get('name') as string
   const email = formData.get('email') as string
   const phone = formData.get('phone') as string
+  const criteria = formData.get('criteria') as string
   const customSlug = formData.get('slug') as string | null
 
   if (!clientId) {
@@ -337,6 +350,7 @@ export async function updateClient(formData: FormData) {
   if (name) updateData.name = name
   if (email !== undefined) updateData.email = email || null
   if (phone !== undefined) updateData.phone = phone || null
+  if (criteria !== undefined) updateData.criteria = criteria || null
 
   // Handle slug update
   if (customSlug !== undefined && customSlug !== null && customSlug !== client.slug) {

@@ -53,7 +53,7 @@ export function AdminSidebar({ user }: { user: User }) {
   ]
 
   return (
-    <div className="w-64 h-screen border-r border-white/10 backdrop-blur-md bg-black/40 flex flex-col hidden md:flex shadow-xl sticky top-0">
+    <div className="hidden md:flex md:flex-col w-64 h-screen border-r border-white/10 backdrop-blur-md bg-black/40 shadow-xl sticky top-0">
       {/* Logo/Brand Section */}
       <div className="p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-3">

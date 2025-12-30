@@ -138,13 +138,13 @@ export function PropertyAssignment({
         </CardContent>
       </Card>
 
-      {/* Available Properties */}
+      {/* Saved Properties */}
       <Card className="elevated-card">
         <CardHeader className="pb-6 border-b border-white/10">
           <div className="flex items-center justify-between mb-4">
             <div>
               <CardTitle className="luxury-heading text-2xl tracking-[0.15em] text-white">
-                Available Properties
+                Saved Properties
               </CardTitle>
               <CardDescription className="mt-2 text-white/70 tracking-wide">
                 Add properties to this manager's portfolio

@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge'
 import { PublicPropertyCard } from '@/components/public-property-card'
 import { Logo } from '@/components/logo'
 import { Mail, Phone, Home } from 'lucide-react'
+import { Instagram, Facebook, Linkedin, Twitter } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
-import { ManagerContactForm } from '@/components/manager-contact-form'
 import { trackClientAccess } from '@/lib/actions/clients'
 
 export default async function ClientPublicPage({
@@ -98,9 +98,16 @@ export default async function ClientPublicPage({
                   {client.name}'s Properties
                 </h1>
                 {manager?.name && (
-                  <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">
-                    Curated by {manager.name}
-                  </p>
+                  <div>
+                    <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">
+                      Curated by {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
+                    </p>
+                    {manager.title && (
+                      <p className="text-white/60 tracking-[0.1em] text-xs sm:text-sm mt-1">
+                        {manager.title}
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
               <Badge variant="secondary" className="bg-white/15 text-white border-white/30 backdrop-blur-md text-base sm:text-xl px-5 sm:px-6 py-2 sm:py-3 shadow-lg">
@@ -169,38 +176,97 @@ export default async function ClientPublicPage({
           </div>
         )}
 
-        {/* Contact Form Section */}
-        {manager && (
-          <div className="mt-16 sm:mt-20">
-            <h2 className="luxury-heading text-3xl font-bold mb-8 text-white tracking-[0.2em] text-center">
-              Get in Touch
-            </h2>
-            <ManagerContactForm manager={manager} />
-          </div>
-        )}
       </div>
 
       {/* Footer */}
-      <footer className="mt-20 border-t border-white/10 backdrop-blur-md bg-black/20 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 text-center text-white/80">
-          {manager?.name && (
-            <p className="luxury-heading tracking-[0.2em] text-base mb-4">Curated by {manager.name}</p>
-          )}
-          {manager?.email && (
-            <p className="text-base tracking-wide leading-relaxed">
-              For inquiries, contact{' '}
-              <a href={`mailto:${manager.email}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
-                {manager.email}
-              </a>
-              {manager.phone && (
-                <>
-                  {' '}or call{' '}
-                  <a href={`tel:${manager.phone}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
+      <footer className="mt-20 border-t border-white/10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+          {manager && (
+            <div className="flex flex-col items-center gap-5 text-center">
+              {/* Name and Title */}
+              <div>
+                <p className="text-white/60 text-sm tracking-[0.2em] uppercase mb-1">Your Agent</p>
+                <h3 className="text-white text-lg tracking-wide">
+                  {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
+                </h3>
+                {manager.title && (
+                  <p className="text-white/50 text-sm mt-0.5">{manager.title}</p>
+                )}
+              </div>
+
+              {/* Contact Links */}
+              <div className="flex items-center gap-6 text-sm">
+                {manager.email && (
+                  <a
+                    href={`mailto:${manager.email}`}
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
+                    {manager.email}
+                  </a>
+                )}
+                {manager.email && manager.phone && (
+                  <span className="text-white/30">|</span>
+                )}
+                {manager.phone && (
+                  <a
+                    href={`tel:${manager.phone}`}
+                    className="text-white/70 hover:text-white transition-colors"
+                  >
                     {formatPhoneNumber(manager.phone)}
                   </a>
-                </>
+                )}
+              </div>
+
+              {/* Social Media Links */}
+              {(manager.instagram_url || manager.facebook_url || manager.linkedin_url || manager.twitter_url) && (
+                <div className="flex items-center gap-5">
+                  {manager.instagram_url && (
+                    <a
+                      href={manager.instagram_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/40 hover:text-white transition-colors"
+                      aria-label="Instagram"
+                    >
+                      <Instagram className="h-4 w-4" />
+                    </a>
+                  )}
+                  {manager.facebook_url && (
+                    <a
+                      href={manager.facebook_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/40 hover:text-white transition-colors"
+                      aria-label="Facebook"
+                    >
+                      <Facebook className="h-4 w-4" />
+                    </a>
+                  )}
+                  {manager.linkedin_url && (
+                    <a
+                      href={manager.linkedin_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/40 hover:text-white transition-colors"
+                      aria-label="LinkedIn"
+                    >
+                      <Linkedin className="h-4 w-4" />
+                    </a>
+                  )}
+                  {manager.twitter_url && (
+                    <a
+                      href={manager.twitter_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-white/40 hover:text-white transition-colors"
+                      aria-label="Twitter"
+                    >
+                      <Twitter className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
               )}
-            </p>
+            </div>
           )}
         </div>
       </footer>
@@ -217,7 +283,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const query = supabase
     .from('clients')
-    .select('name, property_managers(name)')
+    .select('name, property_managers(name, last_name)')
 
   if (isUUID) {
     query.eq('id', id)
@@ -235,9 +301,12 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 
   const manager = client.property_managers as any
+  const managerFullName = manager
+    ? (manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name)
+    : 'Your Agent'
 
   return {
-    title: `${client.name}'s Properties - Curated by ${manager?.name || 'Your Agent'}`,
-    description: `Exclusive property portfolio curated for ${client.name} by ${manager?.name || 'your agent'}`,
+    title: `${client.name}'s Properties - Curated by ${managerFullName}`,
+    description: `Exclusive property portfolio curated for ${client.name} by ${managerFullName}`,
   }
 }

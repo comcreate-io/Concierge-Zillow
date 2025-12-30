@@ -111,14 +111,22 @@ function PropertyCard({
         {/* Move Buttons - Mobile */}
         <div className="flex flex-col justify-center bg-white/5 border-r border-white/10 flex-shrink-0">
           <button
-            onClick={() => onMoveUp(index)}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onMoveUp(index)
+            }}
             disabled={index === 0}
             className="flex items-center justify-center w-8 h-10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
             <ChevronUp className="h-5 w-5" />
           </button>
           <button
-            onClick={() => onMoveDown(index)}
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              onMoveDown(index)
+            }}
             disabled={index === totalCount - 1}
             className="flex items-center justify-center w-8 h-10 text-white/50 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
           >
@@ -126,79 +134,99 @@ function PropertyCard({
           </button>
         </div>
 
-        {/* Property Image - Mobile (small thumbnail) */}
-        <div className="w-20 h-20 bg-background/30 relative flex-shrink-0">
-          {firstImage ? (
-            <img
-              src={firstImage}
-              alt={property.address}
-              className="absolute inset-0 w-full h-full object-cover"
-              onError={(e) => {
-                e.currentTarget.style.display = 'none'
-              }}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background to-card">
-              <Home className="h-6 w-6 text-white/20" />
-            </div>
-          )}
-        </div>
-
-        {/* Property Details - Mobile Compact */}
-        <div className="flex-1 p-2 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="text-xs font-bold text-white line-clamp-2 leading-tight flex-1">
-              {property.address}
-            </h3>
-            {(property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price) && (
-              <div className="text-sm font-bold text-white flex-shrink-0">
-                {property.show_monthly_rent && property.custom_monthly_rent && formatCurrency(property.custom_monthly_rent)}
-                {property.show_nightly_rate && property.custom_nightly_rate && !property.show_monthly_rent && formatCurrency(property.custom_nightly_rate)}
-                {property.show_purchase_price && property.custom_purchase_price && !property.show_monthly_rent && !property.show_nightly_rate && formatCurrency(property.custom_purchase_price)}
+        {/* Clickable Card Area */}
+        <Link href={`/admin/properties/${property.id}/edit`} className="flex flex-1 min-w-0">
+          {/* Property Image - Mobile */}
+          <div className="w-20 h-20 bg-background/30 relative flex-shrink-0">
+            {firstImage ? (
+              <img
+                src={firstImage}
+                alt={property.address}
+                className="absolute inset-0 w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                }}
+              />
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-background to-card">
+                <Home className="h-6 w-6 text-white/20" />
               </div>
             )}
           </div>
 
-          {/* Compact Stats Row */}
-          <div className="flex items-center gap-3 mt-1.5 text-[10px] text-white/70">
-            <span className="flex items-center gap-0.5">
-              <BedDouble className="h-3 w-3" />
-              {formatPropertyValue(property.bedrooms)}
-            </span>
-            <span className="flex items-center gap-0.5">
-              <Bath className="h-3 w-3" />
-              {formatPropertyValue(property.bathrooms)}
-            </span>
-            <span className="flex items-center gap-0.5">
-              <Maximize className="h-3 w-3" />
-              {formatPropertyValue(property.area, formatNumber)}
-            </span>
-          </div>
+          {/* Property Details - Mobile Compact */}
+          <div className="flex-1 p-2 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3 className="text-xs font-bold text-white line-clamp-2 leading-tight flex-1">
+                {property.address}
+              </h3>
+              {(property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price) && (
+                <div className="text-sm font-bold text-white flex-shrink-0">
+                  {property.show_monthly_rent && property.custom_monthly_rent && formatCurrency(property.custom_monthly_rent)}
+                  {property.show_nightly_rate && property.custom_nightly_rate && !property.show_monthly_rent && formatCurrency(property.custom_nightly_rate)}
+                  {property.show_purchase_price && property.custom_purchase_price && !property.show_monthly_rent && !property.show_nightly_rate && formatCurrency(property.custom_purchase_price)}
+                </div>
+              )}
+            </div>
 
-          {/* Compact Actions */}
-          <div className="flex items-center gap-1.5 mt-2">
-            <Link href={`/admin/properties/${property.id}/edit`}>
-              <Button size="sm" className="h-6 px-2 text-[10px] bg-white text-black hover:bg-white/90">
-                <Pencil className="h-2.5 w-2.5 mr-0.5" />
+            {/* Compact Stats Row */}
+            <div className="flex items-center gap-3 mt-1.5 text-[10px] text-white/70">
+              <span className="flex items-center gap-0.5">
+                <BedDouble className="h-3 w-3" />
+                {formatPropertyValue(property.bedrooms)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Bath className="h-3 w-3" />
+                {formatPropertyValue(property.bathrooms)}
+              </span>
+              <span className="flex items-center gap-0.5">
+                <Maximize className="h-3 w-3" />
+                {formatPropertyValue(property.area, formatNumber)}
+              </span>
+            </div>
+
+            {/* Compact Actions */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <Button
+                size="sm"
+                className="h-6 px-2 text-[10px] bg-white text-black hover:bg-white/90"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  window.location.href = `/admin/properties/${property.id}/edit`
+                }}
+              >
+                <Pencil className="h-2.5 w-2.5 mr-1" />
                 Edit
               </Button>
-            </Link>
-            <Link href={`/property/${property.id}`}>
-              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] border-white/40 text-white">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] border-white/40 text-white"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  window.open(`/property/${property.id}`, '_blank')
+                }}
+              >
                 View
               </Button>
-            </Link>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onDelete(property.id)}
-              disabled={deletingId === property.id}
-              className="h-6 px-2 text-[10px] border-red-500/40 text-red-400 ml-auto"
-            >
-              <Trash2 className="h-2.5 w-2.5" />
-            </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  onDelete(property.id)
+                }}
+                disabled={deletingId === property.id}
+                className="h-6 px-2 text-[10px] border-red-500/40 text-red-400 ml-auto"
+              >
+                <Trash2 className="h-2.5 w-2.5" />
+              </Button>
+            </div>
           </div>
-        </div>
+        </Link>
       </div>
 
       {/* Desktop Layout */}
@@ -591,7 +619,7 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
           </h1>
           <p className="text-white/70 text-sm sm:text-base">
             <span className="hidden md:inline">Drag to reorder</span>
-            <span className="md:hidden">Use arrows to reorder</span>
+            <span className="md:hidden">Tap to edit • Arrows to reorder</span>
             {isSaving && <span className="text-white animate-pulse"> • Saving...</span>}
           </p>
         </div>

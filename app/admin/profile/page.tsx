@@ -1,8 +1,8 @@
 import { getCurrentManagerProfile } from '@/lib/actions/clients'
 import { ProfilePictureUpload } from '@/components/profile-picture-upload'
+import { ProfileEditForm } from '@/components/profile-edit-form'
 import { Card, CardContent } from '@/components/ui/card'
-import { Mail, Phone, AlertCircle } from 'lucide-react'
-import { formatPhoneNumber } from '@/lib/utils'
+import { Mail, AlertCircle, Briefcase } from 'lucide-react'
 
 export default async function MyProfilePage() {
   // Get current manager profile
@@ -34,6 +34,11 @@ export default async function MyProfilePage() {
     )
   }
 
+  // Build full name
+  const fullName = managerProfile.last_name
+    ? `${managerProfile.name} ${managerProfile.last_name}`
+    : managerProfile.name
+
   return (
     <div className="space-y-8 animate-fade-in">
       {/* Header Section */}
@@ -42,7 +47,7 @@ export default async function MyProfilePage() {
         <p className="text-white/70 mt-2 tracking-wide">View and manage your profile information</p>
       </div>
 
-      {/* Profile Card */}
+      {/* Profile Overview Card */}
       <Card className="elevated-card overflow-hidden">
         <CardContent className="p-8">
           <div className="flex flex-col md:flex-row md:items-start gap-8">
@@ -51,35 +56,46 @@ export default async function MyProfilePage() {
               <ProfilePictureUpload
                 managerId={managerProfile.id}
                 currentPictureUrl={managerProfile.profile_picture_url}
-                managerName={managerProfile.name}
+                managerName={fullName}
               />
             </div>
 
             {/* Manager Info */}
             <div className="flex-1">
-              <h2 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white mb-4">
-                {managerProfile.name}
+              <h2 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white mb-2">
+                {fullName}
               </h2>
-              <div className="flex flex-col gap-3 text-white/80">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/10 rounded-lg">
-                    <Mail className="h-4 w-4 text-white" />
-                  </div>
-                  <span className="tracking-wide">{managerProfile.email}</span>
+              {managerProfile.title && (
+                <div className="flex items-center gap-2 text-white/70 mb-4">
+                  <Briefcase className="h-4 w-4" />
+                  <span className="tracking-wide">{managerProfile.title}</span>
                 </div>
-                {managerProfile.phone && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white/10 rounded-lg">
-                      <Phone className="h-4 w-4 text-white" />
-                    </div>
-                    <span className="tracking-wide">{formatPhoneNumber(managerProfile.phone)}</span>
-                  </div>
-                )}
+              )}
+              <div className="flex items-center gap-3 text-white/80">
+                <div className="p-2 bg-white/10 rounded-lg">
+                  <Mail className="h-4 w-4 text-white" />
+                </div>
+                <span className="tracking-wide">{managerProfile.email}</span>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Form */}
+      <ProfileEditForm
+        managerId={managerProfile.id}
+        initialData={{
+          name: managerProfile.name,
+          last_name: managerProfile.last_name,
+          title: managerProfile.title,
+          phone: managerProfile.phone,
+          instagram_url: managerProfile.instagram_url,
+          facebook_url: managerProfile.facebook_url,
+          linkedin_url: managerProfile.linkedin_url,
+          twitter_url: managerProfile.twitter_url,
+        }}
+      />
     </div>
   )
 }

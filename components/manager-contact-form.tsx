@@ -13,6 +13,8 @@ interface ManagerContactFormProps {
   manager: {
     id: string
     name: string
+    last_name?: string | null
+    title?: string | null
     email: string
     phone?: string
     profile_picture_url?: string
@@ -20,11 +22,16 @@ interface ManagerContactFormProps {
 }
 
 export function ManagerContactForm({ manager }: ManagerContactFormProps) {
+  // Build full name
+  const fullName = manager.last_name
+    ? `${manager.name} ${manager.last_name}`
+    : manager.name
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     phone: '',
-    message: `Hello ${manager.name}, I'd like to inquire about your property management services.`
+    message: `Hello ${fullName}, I'd like to inquire about your property management services.`
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -59,7 +66,7 @@ export function ManagerContactForm({ manager }: ManagerContactFormProps) {
         name: '',
         email: '',
         phone: '',
-        message: `Hello ${manager.name}, I'd like to inquire about your property management services.`
+        message: `Hello ${fullName}, I'd like to inquire about your property management services.`
       })
 
       // Reset success message after 5 seconds
@@ -87,7 +94,7 @@ export function ManagerContactForm({ manager }: ManagerContactFormProps) {
         <Card className="bg-card/50 border border-border/30 backdrop-blur-sm h-full">
           <CardHeader className="pb-4">
             <CardTitle className="luxury-heading text-xl text-white tracking-[0.15em]">
-              Contact {manager.name}
+              Contact {fullName}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -97,7 +104,7 @@ export function ManagerContactForm({ manager }: ManagerContactFormProps) {
                 {manager.profile_picture_url ? (
                   <img
                     src={manager.profile_picture_url}
-                    alt={manager.name}
+                    alt={fullName}
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -108,9 +115,14 @@ export function ManagerContactForm({ manager }: ManagerContactFormProps) {
 
             {/* Manager Details */}
             <div className="text-center space-y-4">
-              <h3 className="text-2xl font-bold text-white tracking-wide">
-                {manager.name}
-              </h3>
+              <div>
+                <h3 className="text-2xl font-bold text-white tracking-wide">
+                  {fullName}
+                </h3>
+                {manager.title && (
+                  <p className="text-white/70 text-sm mt-1 tracking-wide">{manager.title}</p>
+                )}
+              </div>
 
               {/* Email */}
               {manager.email && (
@@ -155,7 +167,7 @@ export function ManagerContactForm({ manager }: ManagerContactFormProps) {
             Send an Inquiry
           </CardTitle>
           <CardDescription className="text-white/70 text-base">
-            Get in touch with {manager.name} about property management services
+            Get in touch with {fullName} about property management services
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

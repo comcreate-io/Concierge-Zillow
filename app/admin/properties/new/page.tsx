@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Home, Sparkles, ArrowLeft, CheckCircle2, Edit3, Link2, DollarSign } from "lucide-react"
+import { ImageDropZone } from "@/components/image-drop-zone"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { saveProperty } from "@/lib/supabase"
@@ -73,7 +74,7 @@ export default function AddPropertyPage() {
     bathrooms: "",
     area: "",
     zillow_url: "",
-    images: "",
+    images: [] as string[],
     description: ""
   })
 
@@ -113,19 +114,13 @@ export default function AddPropertyPage() {
     setSuccess(false)
 
     try {
-      // Parse images from comma-separated URLs
-      const imageUrls = manualData.images
-        .split(',')
-        .map(url => url.trim())
-        .filter(url => url.length > 0)
-
       const newProperty = {
         address: manualData.address,
         bedrooms: manualData.bedrooms || "",
         bathrooms: manualData.bathrooms || "",
         area: manualData.area || "",
         zillow_url: manualData.zillow_url || "",
-        images: imageUrls,
+        images: manualData.images,
         description: manualData.description || undefined,
         // Pricing options
         show_monthly_rent: pricingOptions.show_monthly_rent,
@@ -164,7 +159,7 @@ export default function AddPropertyPage() {
         bathrooms: "",
         area: "",
         zillow_url: "",
-        images: "",
+        images: [],
         description: ""
       })
       setPricingOptions({
@@ -696,13 +691,11 @@ export default function AddPropertyPage() {
 
               <div className="space-y-4">
                 <label className="text-sm font-bold uppercase tracking-wider text-white-light">
-                  Image URLs (Optional)
+                  Property Images (Optional)
                 </label>
-                <Textarea
-                  placeholder="Comma-separated image URLs (e.g., https://example.com/image1.jpg, https://example.com/image2.jpg)"
-                  value={manualData.images}
-                  onChange={(e) => setManualData({...manualData, images: e.target.value})}
-                  className="min-h-[100px] bg-white/5 border-white/30 focus:border-white text-base tracking-wide resize-none"
+                <ImageDropZone
+                  images={manualData.images}
+                  onImagesChange={(images) => setManualData({...manualData, images})}
                   disabled={isScraping}
                 />
               </div>
@@ -897,7 +890,7 @@ export default function AddPropertyPage() {
               </p>
               <p className="flex items-start gap-3">
                 <span className="text-white font-bold">3.</span>
-                Add image URLs separated by commas for property photos (optional)
+                Drag and drop or click to upload property photos (optional)
               </p>
               <p className="flex items-start gap-3">
                 <span className="text-white font-bold">4.</span>

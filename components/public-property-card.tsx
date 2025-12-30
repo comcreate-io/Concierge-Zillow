@@ -1,8 +1,6 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Home, MapPin, BedDouble, Bath, Maximize, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { formatCurrency, formatNumber, formatPropertyValue, isValidPropertyValue } from '@/lib/utils'
@@ -151,75 +149,105 @@ export function PublicPropertyCard({ property, clientId }: { property: Property;
         </div>
       ) : null}
 
-      {/* Property Details */}
-      <CardContent className="p-7 space-y-6 flex flex-col">
-        {/* Address - respect show_address */}
-        {property.show_address !== false && (
-          <div className="min-h-[80px] flex items-start">
-            <div className="flex items-start gap-2 sm:gap-3">
-              <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-white/80 flex-shrink-0 mt-1" />
-              <h3 className="text-lg sm:text-xl font-bold text-white line-clamp-2 tracking-wide leading-relaxed group-hover:text-white transition-colors duration-300">
-                {property.address || 'Address not available'}
-              </h3>
+      {/* Property Details - Fully Clickable */}
+      <Link
+        href={clientId ? `/property/${property.id}?client=${clientId}` : `/property/${property.id}`}
+        className="block cursor-pointer"
+      >
+        <CardContent className="p-7 space-y-6 flex flex-col hover:bg-white/5 transition-colors duration-300">
+          {/* Address - respect show_address */}
+          {property.show_address !== false && (
+            <div className="min-h-[80px] flex items-start">
+              <div className="flex items-start gap-2 sm:gap-3">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-white/80 flex-shrink-0 mt-1" />
+                <h3 className="text-lg sm:text-xl font-bold text-white line-clamp-2 tracking-wide leading-relaxed group-hover:text-white transition-colors duration-300">
+                  {property.address || 'Address not available'}
+                </h3>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Property Stats with Enhanced Design - respect visibility toggles */}
-        {(() => {
-          const showBedrooms = property.show_bedrooms !== false
-          const showBathrooms = property.show_bathrooms !== false
-          const showArea = property.show_area !== false
-          const visibleStats = [showBedrooms, showBathrooms, showArea].filter(Boolean).length
+          {/* Property Stats with Enhanced Design - respect visibility toggles */}
+          {(() => {
+            const showBedrooms = property.show_bedrooms !== false
+            const showBathrooms = property.show_bathrooms !== false
+            const showArea = property.show_area !== false
+            const visibleStats = [showBedrooms, showBathrooms, showArea].filter(Boolean).length
 
-          if (visibleStats === 0) return null
+            if (visibleStats === 0) return null
 
-          const gridCols = visibleStats === 3 ? 'grid-cols-3' : visibleStats === 2 ? 'grid-cols-2' : 'grid-cols-1'
+            const gridCols = visibleStats === 3 ? 'grid-cols-3' : visibleStats === 2 ? 'grid-cols-2' : 'grid-cols-1'
 
-          return (
-            <div className={`grid ${gridCols} gap-3 sm:gap-4`}>
-              {showBedrooms && (
-                <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                  <BedDouble className="h-6 w-6 mx-auto mb-2 text-white" />
-                  <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bedrooms)}</p>
-                  <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
-                    {property.label_bedrooms || 'Beds'}
-                  </p>
+            return (
+              <div className={`grid ${gridCols} gap-3 sm:gap-4`}>
+                {showBedrooms && (
+                  <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
+                    <BedDouble className="h-6 w-6 mx-auto mb-2 text-white" />
+                    <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bedrooms)}</p>
+                    <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
+                      {property.label_bedrooms || 'Beds'}
+                    </p>
+                  </div>
+                )}
+                {showBathrooms && (
+                  <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
+                    <Bath className="h-6 w-6 mx-auto mb-2 text-white" />
+                    <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bathrooms)}</p>
+                    <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
+                      {property.label_bathrooms || 'Baths'}
+                    </p>
+                  </div>
+                )}
+                {showArea && (
+                  <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
+                    <Maximize className="h-6 w-6 mx-auto mb-2 text-white" />
+                    <p className="text-2xl font-bold text-white">
+                      {formatPropertyValue(property.area, formatNumber)}
+                    </p>
+                    <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
+                      {property.label_area || 'Sq Ft'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          {/* Price Display - Full Width Card */}
+          {(() => {
+            const prices: { value: number; label: string }[] = []
+            if (property.show_monthly_rent && property.custom_monthly_rent) {
+              prices.push({ value: property.custom_monthly_rent, label: 'per month' })
+            }
+            if (property.show_nightly_rate && property.custom_nightly_rate) {
+              prices.push({ value: property.custom_nightly_rate, label: 'per night' })
+            }
+            if (property.show_purchase_price && property.custom_purchase_price) {
+              prices.push({ value: property.custom_purchase_price, label: 'purchase price' })
+            }
+
+            return (
+              <div className="text-center p-3 glass-card-accent rounded-xl transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
+                <div className="flex items-center justify-center gap-4 min-h-[44px]">
+                  {prices.length > 0 ? (
+                    prices.map((price, index) => (
+                      <div key={index} className="flex flex-col items-center">
+                        <p className="text-xl font-bold text-white">{formatCurrency(price.value)}</p>
+                        <p className="text-[9px] text-white/70 uppercase tracking-widest font-semibold">
+                          {price.label}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-white/40 text-sm">Price on request</p>
+                  )}
                 </div>
-              )}
-              {showBathrooms && (
-                <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                  <Bath className="h-6 w-6 mx-auto mb-2 text-white" />
-                  <p className="text-2xl font-bold text-white">{formatPropertyValue(property.bathrooms)}</p>
-                  <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
-                    {property.label_bathrooms || 'Baths'}
-                  </p>
-                </div>
-              )}
-              {showArea && (
-                <div className="text-center p-3 sm:p-4 glass-card-accent rounded-xl transition-all duration-300 hover:scale-105 hover:shadow-xl">
-                  <Maximize className="h-6 w-6 mx-auto mb-2 text-white" />
-                  <p className="text-2xl font-bold text-white">
-                    {formatPropertyValue(property.area, formatNumber)}
-                  </p>
-                  <p className="text-[10px] text-white/70 uppercase tracking-widest mt-1.5 font-semibold">
-                    {property.label_area || 'Sq Ft'}
-                  </p>
-                </div>
-              )}
-            </div>
-          )
-        })()}
+              </div>
+            )
+          })()}
 
-        {/* Actions with Luxury Button */}
-        <div className="pt-4 border-t border-white/20">
-          <Button asChild className="w-full btn-luxury text-base py-6 group/btn" variant="default">
-            <Link href={clientId ? `/property/${property.id}?client=${clientId}` : `/property/${property.id}`}>
-              <span className="group-hover/btn:tracking-widest transition-all duration-300">View Details</span>
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
+        </CardContent>
+      </Link>
     </Card>
   )
 }

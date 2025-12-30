@@ -1,14 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Home, ArrowLeft, Save, Loader2, X, Plus, DollarSign, Settings } from "lucide-react"
+import { Home, ArrowLeft, Save, Loader2, X, DollarSign, Settings } from "lucide-react"
+import { ImageDropZone } from "@/components/image-drop-zone"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PropertyManagerSelect, PropertyManager } from "@/components/property-manager-select"
 import { assignPropertyToManagers, type PropertyCustomization } from "@/lib/actions/properties"
@@ -29,7 +30,11 @@ interface PropertyFormData {
 export default function EditPropertyPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const propertyId = params.id as string
+  const returnTo = searchParams.get('returnTo')
+  const backUrl = returnTo || '/admin/properties'
+  const backLabel = returnTo ? 'Back to Client' : 'Back to Properties'
 
   const [formData, setFormData] = useState<PropertyFormData>({
     address: "",
@@ -40,7 +45,6 @@ export default function EditPropertyPage() {
     description: "",
     images: []
   })
-  const [newImageUrl, setNewImageUrl] = useState("")
   const [propertyManagers, setPropertyManagers] = useState<PropertyManager[]>([])
   const [selectedManagerIds, setSelectedManagerIds] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -56,9 +60,6 @@ export default function EditPropertyPage() {
     show_purchase_price: false,
     custom_purchase_price: ""
   })
-
-  // Show all images toggle
-  const [showAllImages, setShowAllImages] = useState(false)
 
   // Property customization dialog
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
@@ -149,21 +150,8 @@ export default function EditPropertyPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleAddImage = () => {
-    if (newImageUrl.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        images: [...prev.images, newImageUrl.trim()]
-      }))
-      setNewImageUrl("")
-    }
-  }
-
-  const handleRemoveImage = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }))
+  const handleImagesChange = (images: string[]) => {
+    setFormData(prev => ({ ...prev, images }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,8 +190,8 @@ export default function EditPropertyPage() {
       // Update manager assignments
       await assignPropertyToManagers(propertyId, selectedManagerIds)
 
-      // Redirect back to properties list
-      router.push('/admin/properties')
+      // Redirect back to previous page
+      router.push(backUrl)
     } catch (err) {
       console.error('Error updating property:', err)
       setError(err instanceof Error ? err.message : 'Failed to update property')
@@ -224,10 +212,10 @@ export default function EditPropertyPage() {
     return (
       <div className="space-y-8">
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/admin/properties">
+          <Link href={backUrl}>
             <Button variant="ghost" className="text-white hover:text-white/80">
               <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Properties
+              {backLabel}
             </Button>
           </Link>
         </div>
@@ -242,53 +230,69 @@ export default function EditPropertyPage() {
   }
 
   return (
-    <div className="space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-6">
-        <div className="flex items-center gap-4">
-          <Link href="/admin/properties">
-            <Button variant="ghost" className="text-white hover:text-white/80">
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back
+    <div className="space-y-4 sm:space-y-8 animate-fade-in pb-24 sm:pb-0">
+      {/* Header - Mobile Optimized */}
+      <div className="space-y-4">
+        {/* Back button row */}
+        <div className="flex items-center justify-between">
+          <Link href={backUrl}>
+            <Button variant="ghost" size="sm" className="text-white hover:text-white/80 -ml-2 sm:ml-0">
+              <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2" />
+              <span className="text-sm sm:text-base">Back</span>
             </Button>
           </Link>
+          {/* Customize button - visible on mobile in header */}
+          <Button
+            type="button"
+            onClick={() => setIsCustomizationOpen(true)}
+            size="sm"
+            className="sm:hidden bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white text-xs px-3"
+          >
+            <Settings className="h-4 w-4 mr-1" />
+            Customize
+          </Button>
+        </div>
+
+        {/* Title and desktop customize button */}
+        <div className="flex items-start sm:items-center justify-between gap-4">
           <div>
-            <h1 className="luxury-heading text-3xl sm:text-4xl md:text-5xl font-bold tracking-[0.15em] mb-3 text-white">
+            <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.1em] sm:tracking-[0.15em] text-white">
               Edit Property
             </h1>
-            <p className="text-white/70 mt-2 tracking-wide text-lg">
-              Update property details and assignments
+            <p className="text-white/70 mt-1 sm:mt-2 tracking-wide text-sm sm:text-base">
+              Update property details
             </p>
           </div>
+          {/* Customize button - desktop only */}
+          <Button
+            type="button"
+            onClick={() => setIsCustomizationOpen(true)}
+            className="hidden sm:flex bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
+          >
+            <Settings className="h-5 w-5 mr-2" />
+            Customize Display
+          </Button>
         </div>
-        <Button
-          type="button"
-          onClick={() => setIsCustomizationOpen(true)}
-          className="bg-gradient-to-r from-purple-500 to-blue-600 hover:from-purple-600 hover:to-blue-700 text-white"
-        >
-          <Settings className="h-5 w-5 mr-2" />
-          Customize Display
-        </Button>
       </div>
 
-      <div className="h-px divider-accent my-8" />
+      <div className="h-px divider-accent" />
 
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-8">
         {/* Basic Information */}
         <Card className="glass-card-accent elevated-card">
-          <CardHeader>
-            <CardTitle className="luxury-heading text-3xl tracking-[0.15em] text-white">
-              <Home className="inline-block h-7 w-7 mr-3" />
-              Property Information
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white flex items-center">
+              <Home className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 flex-shrink-0" />
+              Property Info
             </CardTitle>
-            <CardDescription className="text-white/70 text-base tracking-wide">
-              Edit the basic details of this property
+            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
+              Edit basic property details
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
             {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="address" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
                 Property Address *
               </Label>
               <Input
@@ -298,15 +302,15 @@ export default function EditPropertyPage() {
                 onChange={handleInputChange}
                 placeholder="123 Main St, City, State 12345"
                 required
-                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-10 sm:h-12 text-sm sm:text-base"
               />
             </div>
 
             {/* Property Details Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="bedrooms" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
-                  Bedrooms
+            <div className="grid grid-cols-3 gap-2 sm:gap-6">
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="bedrooms" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
+                  Beds
                 </Label>
                 <Input
                   id="bedrooms"
@@ -314,13 +318,13 @@ export default function EditPropertyPage() {
                   value={formData.bedrooms}
                   onChange={handleInputChange}
                   placeholder="3"
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
+                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-10 sm:h-12 text-sm sm:text-base"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="bathrooms" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
-                  Bathrooms
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="bathrooms" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
+                  Baths
                 </Label>
                 <Input
                   id="bathrooms"
@@ -328,13 +332,13 @@ export default function EditPropertyPage() {
                   value={formData.bathrooms}
                   onChange={handleInputChange}
                   placeholder="2"
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
+                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-10 sm:h-12 text-sm sm:text-base"
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="area" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
-                  Area (sq ft)
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="area" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
+                  Sq Ft
                 </Label>
                 <Input
                   id="area"
@@ -342,14 +346,14 @@ export default function EditPropertyPage() {
                   value={formData.area}
                   onChange={handleInputChange}
                   placeholder="1500"
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
+                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-10 sm:h-12 text-sm sm:text-base"
                 />
               </div>
             </div>
 
             {/* Zillow URL */}
-            <div className="space-y-2">
-              <Label htmlFor="zillow_url" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="zillow_url" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
                 Zillow URL
               </Label>
               <Input
@@ -358,13 +362,13 @@ export default function EditPropertyPage() {
                 value={formData.zillow_url}
                 onChange={handleInputChange}
                 placeholder="https://www.zillow.com/..."
-                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-10 sm:h-12 text-sm sm:text-base"
               />
             </div>
 
             {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description" className="text-white/90 uppercase tracking-wide text-sm font-semibold">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="description" className="text-white/90 uppercase tracking-wide text-xs sm:text-sm font-semibold">
                 Description
               </Label>
               <Textarea
@@ -373,8 +377,8 @@ export default function EditPropertyPage() {
                 value={formData.description || ""}
                 onChange={handleInputChange}
                 placeholder="Enter property description..."
-                rows={6}
-                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 resize-none"
+                rows={4}
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/50 resize-none text-sm sm:text-base sm:rows-6"
               />
             </div>
           </CardContent>
@@ -382,84 +386,90 @@ export default function EditPropertyPage() {
 
         {/* Pricing Display Options */}
         <Card className="glass-card-accent elevated-card">
-          <CardHeader>
-            <CardTitle className="luxury-heading text-3xl tracking-[0.15em] text-white">
-              <DollarSign className="inline-block h-7 w-7 mr-3" />
-              Pricing Display Options
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white flex items-center">
+              <DollarSign className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 flex-shrink-0" />
+              Pricing Options
             </CardTitle>
-            <CardDescription className="text-white/70 text-base tracking-wide">
-              Choose which pricing to display on property pages
+            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
+              Choose pricing to display
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
             {/* Monthly Rent */}
-            <div className="flex items-center gap-4">
-              <Checkbox
-                id="edit_show_monthly_rent"
-                checked={pricingOptions.show_monthly_rent}
-                onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_monthly_rent: !!checked }))}
-                className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Label htmlFor="edit_show_monthly_rent" className="text-white font-medium cursor-pointer">Monthly Rent</Label>
-                  <span className="text-white/50 text-sm">(for long-term rentals)</span>
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="edit_show_monthly_rent"
+                  checked={pricingOptions.show_monthly_rent}
+                  onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_monthly_rent: !!checked }))}
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0 h-5 w-5"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                  <Label htmlFor="edit_show_monthly_rent" className="text-white font-medium cursor-pointer text-sm sm:text-base">Monthly Rent</Label>
+                  <span className="text-white/50 text-xs sm:text-sm">(long-term)</span>
                 </div>
+              </div>
+              <div className="sm:flex-1 pl-8 sm:pl-0">
                 <Input
                   type="number"
                   placeholder="e.g., 50000"
                   value={pricingOptions.custom_monthly_rent}
                   onChange={(e) => setPricingOptions(prev => ({ ...prev, custom_monthly_rent: e.target.value }))}
-                  className={`h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 ${!pricingOptions.show_monthly_rent ? 'opacity-50' : ''}`}
+                  className={`h-10 sm:h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 text-sm sm:text-base ${!pricingOptions.show_monthly_rent ? 'opacity-50' : ''}`}
                   disabled={!pricingOptions.show_monthly_rent}
                 />
               </div>
             </div>
 
             {/* Nightly Rate */}
-            <div className="flex items-center gap-4">
-              <Checkbox
-                id="edit_show_nightly_rate"
-                checked={pricingOptions.show_nightly_rate}
-                onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_nightly_rate: !!checked }))}
-                className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Label htmlFor="edit_show_nightly_rate" className="text-white font-medium cursor-pointer">Nightly Rate</Label>
-                  <span className="text-white/50 text-sm">(for short-term rentals)</span>
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="edit_show_nightly_rate"
+                  checked={pricingOptions.show_nightly_rate}
+                  onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_nightly_rate: !!checked }))}
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0 h-5 w-5"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                  <Label htmlFor="edit_show_nightly_rate" className="text-white font-medium cursor-pointer text-sm sm:text-base">Nightly Rate</Label>
+                  <span className="text-white/50 text-xs sm:text-sm">(short-term)</span>
                 </div>
+              </div>
+              <div className="sm:flex-1 pl-8 sm:pl-0">
                 <Input
                   type="number"
                   placeholder="e.g., 1750"
                   value={pricingOptions.custom_nightly_rate}
                   onChange={(e) => setPricingOptions(prev => ({ ...prev, custom_nightly_rate: e.target.value }))}
-                  className={`h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 ${!pricingOptions.show_nightly_rate ? 'opacity-50' : ''}`}
+                  className={`h-10 sm:h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 text-sm sm:text-base ${!pricingOptions.show_nightly_rate ? 'opacity-50' : ''}`}
                   disabled={!pricingOptions.show_nightly_rate}
                 />
-                <p className="text-xs text-white/50 mt-1">Will display "not including taxes"</p>
+                <p className="text-[10px] sm:text-xs text-white/50 mt-1">Will display "not including taxes"</p>
               </div>
             </div>
 
             {/* Purchase Price */}
-            <div className="flex items-center gap-4">
-              <Checkbox
-                id="edit_show_purchase_price"
-                checked={pricingOptions.show_purchase_price}
-                onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_purchase_price: !!checked }))}
-                className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0"
-              />
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Label htmlFor="edit_show_purchase_price" className="text-white font-medium cursor-pointer">Purchase Price</Label>
-                  <span className="text-white/50 text-sm">(for property sales)</span>
+            <div className="space-y-2 sm:space-y-0 sm:flex sm:items-center sm:gap-4">
+              <div className="flex items-center gap-3">
+                <Checkbox
+                  id="edit_show_purchase_price"
+                  checked={pricingOptions.show_purchase_price}
+                  onCheckedChange={(checked) => setPricingOptions(prev => ({ ...prev, show_purchase_price: !!checked }))}
+                  className="border-white/30 data-[state=checked]:bg-white data-[state=checked]:text-black flex-shrink-0 h-5 w-5"
+                />
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                  <Label htmlFor="edit_show_purchase_price" className="text-white font-medium cursor-pointer text-sm sm:text-base">Purchase Price</Label>
+                  <span className="text-white/50 text-xs sm:text-sm">(sales)</span>
                 </div>
+              </div>
+              <div className="sm:flex-1 pl-8 sm:pl-0">
                 <Input
                   type="number"
                   placeholder="e.g., 10000000"
                   value={pricingOptions.custom_purchase_price}
                   onChange={(e) => setPricingOptions(prev => ({ ...prev, custom_purchase_price: e.target.value }))}
-                  className={`h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 ${!pricingOptions.show_purchase_price ? 'opacity-50' : ''}`}
+                  className={`h-10 sm:h-12 bg-white/5 border-white/20 text-white placeholder:text-white/50 text-sm sm:text-base ${!pricingOptions.show_purchase_price ? 'opacity-50' : ''}`}
                   disabled={!pricingOptions.show_purchase_price}
                 />
               </div>
@@ -469,106 +479,34 @@ export default function EditPropertyPage() {
 
         {/* Images */}
         <Card className="glass-card-accent elevated-card">
-          <CardHeader>
-            <CardTitle className="luxury-heading text-3xl tracking-[0.15em] text-white">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white">
               Property Images
             </CardTitle>
-            <CardDescription className="text-white/70 text-base tracking-wide">
-              Manage property image URLs
+            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
+              Tap or drag to upload images
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Add Image */}
-            <div className="space-y-2">
-              <Label className="text-white/90 uppercase tracking-wide text-sm font-semibold">
-                Add Image URL
-              </Label>
-              <div className="flex gap-2">
-                <Input
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  placeholder="https://example.com/image.jpg"
-                  className="bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleAddImage()
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  onClick={handleAddImage}
-                  className="bg-white text-black hover:bg-white/90"
-                >
-                  <Plus className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Current Images */}
-            {formData.images.length > 0 && (
-              <div className="space-y-3">
-                <Label className="text-white/90 uppercase tracking-wide text-sm font-semibold">
-                  Current Images ({formData.images.length})
-                </Label>
-                <div className="grid grid-cols-1 gap-3">
-                  {(showAllImages ? formData.images : formData.images.slice(0, 3)).map((imageUrl, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center gap-3 p-3 glass-card-accent rounded-lg"
-                    >
-                      <div className="w-20 h-20 flex-shrink-0 bg-white/5 rounded overflow-hidden">
-                        <img
-                          src={imageUrl}
-                          alt={`Property image ${index + 1}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.style.display = 'none'
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-white/70 text-sm truncate">{imageUrl}</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRemoveImage(index)}
-                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                      >
-                        <X className="h-5 w-5" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-                {formData.images.length > 3 && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setShowAllImages(!showAllImages)}
-                    className="w-full text-white/70 hover:text-white hover:bg-white/10 border border-white/20"
-                  >
-                    {showAllImages ? `Show Less` : `Show More (${formData.images.length - 3} more)`}
-                  </Button>
-                )}
-              </div>
-            )}
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <ImageDropZone
+              images={formData.images}
+              onImagesChange={handleImagesChange}
+              disabled={isSaving}
+            />
           </CardContent>
         </Card>
 
         {/* Property Managers */}
         <Card className="glass-card-accent elevated-card">
-          <CardHeader>
-            <CardTitle className="luxury-heading text-3xl tracking-[0.15em] text-white">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white">
               Property Managers
             </CardTitle>
-            <CardDescription className="text-white/70 text-base tracking-wide">
+            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
               Assign managers to this property
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             <PropertyManagerSelect
               managers={propertyManagers}
               selectedManagerIds={selectedManagerIds}
@@ -580,14 +518,14 @@ export default function EditPropertyPage() {
         {/* Error Message */}
         {error && (
           <Card className="glass-card-accent border-red-500/30 bg-red-500/10">
-            <CardContent className="p-6">
-              <p className="text-red-400">{error}</p>
+            <CardContent className="p-4 sm:p-6">
+              <p className="text-red-400 text-sm sm:text-base">{error}</p>
             </CardContent>
           </Card>
         )}
 
-        {/* Actions */}
-        <div className="flex gap-4 justify-end pt-6 border-t border-white/10">
+        {/* Desktop Actions */}
+        <div className="hidden sm:flex gap-4 justify-end pt-6 border-t border-white/10">
           <Link href="/admin/properties">
             <Button
               type="button"
@@ -611,6 +549,36 @@ export default function EditPropertyPage() {
               <>
                 <Save className="h-5 w-5 mr-2" />
                 Save Changes
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Mobile Sticky Actions */}
+        <div className="sm:hidden fixed bottom-0 left-0 right-0 z-50 bg-background/95 backdrop-blur-lg border-t border-white/10 p-4 flex gap-3">
+          <Link href="/admin/properties" className="flex-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full border-white/40 hover:bg-white/10 text-white h-12 text-sm"
+            >
+              Cancel
+            </Button>
+          </Link>
+          <Button
+            type="submit"
+            disabled={isSaving}
+            className="flex-1 btn-luxury h-12 text-sm"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save
               </>
             )}
           </Button>

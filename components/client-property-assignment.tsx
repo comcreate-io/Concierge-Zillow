@@ -27,7 +27,15 @@ import {
 } from '@/lib/actions/clients'
 import { createPropertyAndAssignToClient, NewPropertyData } from '@/lib/actions/properties'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, Upload, DollarSign, Link2, Edit3 } from 'lucide-react'
+import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import Link from 'next/link'
+import { ImageDropZone } from '@/components/image-drop-zone'
 import { saveProperty } from '@/lib/supabase'
 import { assignPropertyToManagers } from '@/lib/actions/properties'
 import { getCurrentManagerProfile } from '@/lib/actions/clients'
@@ -110,10 +118,21 @@ export function ClientPropertyAssignment({
     show_purchase_price: false,
   })
   const [manualDescription, setManualDescription] = useState('')
-  const [manualImageUrls, setManualImageUrls] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // No images prompt state (for scraping fallback)
+  const [showNoImagesPrompt, setShowNoImagesPrompt] = useState(false)
+  const [scrapedDataForFallback, setScrapedDataForFallback] = useState<{
+    address: string
+    bedrooms: string
+    bathrooms: string
+    area: string
+    description?: string
+    zillowUrl: string
+  } | null>(null)
+
+  
   useEffect(() => {
     setIsMounted(true)
     setAssignedProperties(initialAssignedProperties)
@@ -419,7 +438,6 @@ export function ClientPropertyAssignment({
     })
     setZillowUrl('')
     setManualDescription('')
-    setManualImageUrls('')
     setInputMode('scrape')
     setShowNewPropertyModal(true)
   }
@@ -569,6 +587,21 @@ export function ClientPropertyAssignment({
         }
       }
 
+      // Check if no images were found - show prompt to add manually
+      if (cloudinaryImageUrls.length === 0) {
+        setScrapedDataForFallback({
+          address,
+          bedrooms,
+          bathrooms,
+          area,
+          description: propertyData.description || undefined,
+          zillowUrl: zillowUrl.trim(),
+        })
+        setShowNoImagesPrompt(true)
+        setIsCreatingProperty(false)
+        return
+      }
+
       // Save the property
       const newProperty = {
         address,
@@ -638,7 +671,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property scraped and assigned to client',
+        description: 'Property scraped and added to client',
       })
       setShowNewPropertyModal(false)
       router.refresh()
@@ -716,6 +749,122 @@ export function ClientPropertyAssignment({
     }))
   }
 
+  // Handler for when user wants to add images manually after scraping found none
+  const handleAddImagesManually = () => {
+    if (!scrapedDataForFallback) return
+
+    // Switch to manual mode with pre-filled scraped data
+    setInputMode('manual')
+    setNewPropertyData(prev => ({
+      ...prev,
+      address: scrapedDataForFallback.address,
+      bedrooms: scrapedDataForFallback.bedrooms,
+      bathrooms: scrapedDataForFallback.bathrooms,
+      area: scrapedDataForFallback.area,
+      images: [],
+    }))
+    setManualDescription(scrapedDataForFallback.description || '')
+    setShowNoImagesPrompt(false)
+
+    toast({
+      title: 'Ready for images',
+      description: 'Property details have been filled. You can now add images manually.',
+    })
+  }
+
+  // Handler for when user wants to continue without images
+  const handleContinueWithoutImages = async () => {
+    if (!scrapedDataForFallback) return
+
+    setShowNoImagesPrompt(false)
+    setIsCreatingProperty(true)
+
+    try {
+      // Save the property without images
+      const newProperty = {
+        address: scrapedDataForFallback.address,
+        bedrooms: scrapedDataForFallback.bedrooms,
+        bathrooms: scrapedDataForFallback.bathrooms,
+        area: scrapedDataForFallback.area,
+        zillow_url: scrapedDataForFallback.zillowUrl,
+        images: [] as string[],
+        description: scrapedDataForFallback.description || undefined,
+        show_monthly_rent: newPropertyData.show_monthly_rent,
+        custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
+        show_nightly_rate: newPropertyData.show_nightly_rate,
+        custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
+        show_purchase_price: newPropertyData.show_purchase_price,
+        custom_purchase_price: newPropertyData.custom_purchase_price || null,
+      }
+
+      const savedProperty = await saveProperty(newProperty)
+
+      // Get current manager and assign property
+      const { data: managerProfile } = await getCurrentManagerProfile()
+      if (managerProfile && savedProperty.id) {
+        await assignPropertyToManagers(savedProperty.id, [managerProfile.id])
+      }
+
+      // Assign to client
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: existingAssignments } = await supabase
+        .from('client_property_assignments')
+        .select('position')
+        .eq('client_id', clientId)
+        .order('position', { ascending: false })
+        .limit(1)
+
+      const nextPosition = existingAssignments && existingAssignments.length > 0
+        ? (existingAssignments[0].position || 0) + 1
+        : 0
+
+      await supabase.from('client_property_assignments').insert({
+        client_id: clientId,
+        property_id: savedProperty.id,
+        position: nextPosition,
+        show_monthly_rent_to_client: newPropertyData.show_monthly_rent ?? true,
+        show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
+        show_purchase_price_to_client: newPropertyData.show_purchase_price ?? true,
+      })
+
+      // Generate AI description
+      try {
+        await fetch('/api/generate-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            propertyId: savedProperty.id,
+            address: scrapedDataForFallback.address,
+            bedrooms: scrapedDataForFallback.bedrooms,
+            bathrooms: scrapedDataForFallback.bathrooms,
+            area: scrapedDataForFallback.area,
+          }),
+        })
+      } catch (descError) {
+        console.warn('AI description generation failed:', descError)
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Property created without images',
+      })
+      setShowNewPropertyModal(false)
+      setScrapedDataForFallback(null)
+      router.refresh()
+    } catch (error) {
+      console.error('Error creating property:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsCreatingProperty(false)
+    }
+  }
+
   const handleCreateProperty = async () => {
     if (!newPropertyData.address.trim()) {
       toast({
@@ -729,16 +878,6 @@ export function ClientPropertyAssignment({
     setIsCreatingProperty(true)
 
     try {
-      // Parse images from comma-separated URLs if provided in manual mode
-      let allImages = [...(newPropertyData.images || [])]
-      if (manualImageUrls.trim()) {
-        const urlImages = manualImageUrls
-          .split(',')
-          .map(url => url.trim())
-          .filter(url => url.length > 0)
-        allImages = [...allImages, ...urlImages]
-      }
-
       // Save the property with all data
       const newProperty = {
         address: newPropertyData.address,
@@ -746,7 +885,7 @@ export function ClientPropertyAssignment({
         bathrooms: newPropertyData.bathrooms || "",
         area: newPropertyData.area || "",
         zillow_url: "",
-        images: allImages,
+        images: newPropertyData.images || [],
         description: manualDescription || undefined,
         show_monthly_rent: newPropertyData.show_monthly_rent,
         custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
@@ -810,7 +949,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property created and assigned to client',
+        description: 'Property created and added to client',
       })
       setShowNewPropertyModal(false)
       router.refresh()
@@ -1091,64 +1230,12 @@ export function ClientPropertyAssignment({
                   <p className="text-xs text-white/50 mt-1">Leave blank to auto-generate with AI</p>
                 </div>
 
-                {/* Images - Upload */}
+                {/* Images - Drag & Drop Upload */}
                 <div>
                   <Label className="text-white mb-2 block">Images</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage || isCreatingProperty}
-                    className="w-full border-white/30 text-white hover:bg-white/10"
-                  >
-                    {uploadingImage ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Images
-                      </>
-                    )}
-                  </Button>
-                  {newPropertyData.images && newPropertyData.images.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {newPropertyData.images.map((img, idx) => (
-                        <div key={idx} className="relative w-16 h-16 rounded overflow-hidden group">
-                          <img src={img} alt={`Property ${idx + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(img)}
-                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                            disabled={isCreatingProperty}
-                          >
-                            <X className="h-4 w-4 text-white" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Image URLs */}
-                <div>
-                  <Label htmlFor="image_urls" className="text-white mb-2 block">Or paste Image URLs</Label>
-                  <Textarea
-                    id="image_urls"
-                    value={manualImageUrls}
-                    onChange={(e) => setManualImageUrls(e.target.value)}
-                    placeholder="Comma-separated image URLs..."
-                    className="bg-white/5 border-white/30 text-white placeholder:text-white/40 min-h-[60px]"
+                  <ImageDropZone
+                    images={newPropertyData.images || []}
+                    onImagesChange={(images) => setNewPropertyData(prev => ({ ...prev, images }))}
                     disabled={isCreatingProperty}
                   />
                 </div>
@@ -1273,9 +1360,72 @@ export function ClientPropertyAssignment({
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  {inputMode === 'scrape' ? 'Scrape & Add' : 'Create Property'}
+                  {inputMode === 'scrape' ? 'Scrape & Add' : 'Create & Add'}
                 </>
               )}
+            </Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
+  // No images prompt modal
+  const renderNoImagesPrompt = () => {
+    if (!isMounted || !showNoImagesPrompt || !scrapedDataForFallback) return null
+
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="bg-zinc-900 border border-white/20 rounded-lg p-6 max-w-md w-full">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-full bg-yellow-500/20">
+              <ImageOff className="h-6 w-6 text-yellow-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">No Images Found</h3>
+          </div>
+
+          <p className="text-white/70 mb-2">
+            We couldn't find any images for this property:
+          </p>
+          <p className="text-white font-medium mb-4 truncate">
+            {scrapedDataForFallback.address}
+          </p>
+          <p className="text-white/60 text-sm mb-6">
+            Would you like to add images manually, or continue without images?
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={handleAddImagesManually}
+              className="w-full bg-white text-black hover:bg-white/90"
+            >
+              Add Images Manually
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleContinueWithoutImages}
+              disabled={isCreatingProperty}
+              className="w-full border-white/30 text-white hover:bg-white/10"
+            >
+              {isCreatingProperty ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Continue Without Images'
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowNoImagesPrompt(false)
+                setScrapedDataForFallback(null)
+              }}
+              className="w-full text-white/60 hover:text-white hover:bg-white/5"
+            >
+              Cancel
             </Button>
           </div>
         </div>
@@ -1395,15 +1545,33 @@ export function ClientPropertyAssignment({
 
                     {/* Actions */}
                     <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEditPricing(property)}
-                        disabled={!!isAssigning}
-                        className="hover:bg-white/10 text-white"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!!isAssigning}
+                            className="hover:bg-white/10 text-white"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/20">
+                          <DropdownMenuItem
+                            onClick={() => handleEditPricing(property)}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Pricing Settings
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild className="text-white hover:bg-white/10 cursor-pointer">
+                            <Link href={`/admin/properties/${property.id}/edit?returnTo=/admin/client/${clientId}`}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit Property
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1426,12 +1594,12 @@ export function ClientPropertyAssignment({
         </CardContent>
       </Card>
 
-      {/* Available Properties Section */}
+      {/* Saved Properties Section */}
       <Card className="glass-card border-white/20">
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle className="text-white">Available Properties</CardTitle>
+              <CardTitle className="text-white">Saved Properties</CardTitle>
               <CardDescription className="text-white/70">
                 {availableProperties.length} {availableProperties.length === 1 ? 'property' : 'properties'} available
               </CardDescription>
@@ -1596,6 +1764,7 @@ export function ClientPropertyAssignment({
 
       {renderPricingModal()}
       {renderNewPropertyModal()}
+      {renderNoImagesPrompt()}
     </div>
   )
 }

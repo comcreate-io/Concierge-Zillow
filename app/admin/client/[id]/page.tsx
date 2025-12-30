@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
-import { ArrowLeft, ExternalLink, Copy, User, Mail, Phone, Share2 } from 'lucide-react'
+import { ArrowLeft, ExternalLink, Copy, User, Mail, Phone, Share2, Target } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import { ClientUrlDisplay } from '@/components/client-url-display'
 
@@ -138,6 +138,7 @@ export default async function AdminClientPage({
                       clientName={client.name}
                       clientEmail={client.email}
                       clientPhone={client.phone}
+                      clientCriteria={client.criteria}
                       clientSlug={client.slug}
                     />
                   </div>
@@ -161,6 +162,19 @@ export default async function AdminClientPage({
                   )}
                 </div>
 
+                {/* Client Search Criteria */}
+                {client.criteria && (
+                  <div className="mt-6 pt-6 border-t border-white/10">
+                    <h3 className="text-white/60 text-sm uppercase tracking-widest mb-3 flex items-center gap-2">
+                      <Target className="h-4 w-4" />
+                      Search Criteria
+                    </h3>
+                    <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                      <p className="text-white/90 tracking-wide whitespace-pre-wrap">{client.criteria}</p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Manager Contact Information */}
                 <div className="mt-6 pt-6 border-t border-white/10">
                   <h3 className="text-white/60 text-sm uppercase tracking-widest mb-4">Manager Contact</h3>
@@ -169,7 +183,14 @@ export default async function AdminClientPage({
                       <div className="p-2 bg-white/10 rounded-lg">
                         <User className="h-4 w-4 text-white" />
                       </div>
-                      <span className="text-white font-medium tracking-wide">{manager.name}</span>
+                      <div>
+                        <span className="text-white font-medium tracking-wide">
+                          {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
+                        </span>
+                        {manager.title && (
+                          <p className="text-white/60 text-sm">{manager.title}</p>
+                        )}
+                      </div>
                     </div>
                     {manager.email && (
                       <div className="flex items-center gap-3">
