@@ -216,6 +216,60 @@ export async function getAllClients() {
   return { data: clientsWithCounts as ClientWithDetails[] }
 }
 
+// Get ALL clients in the system (for master view - all team members can access)
+export async function getAllClientsSystem() {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated' }
+  }
+
+  // Get ALL clients with their owner manager info
+  const { data: allClients, error: clientsError } = await supabase
+    .from('clients')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .order('updated_at', { ascending: false })
+
+  if (clientsError) {
+    return { error: clientsError.message }
+  }
+
+  // Get property counts for each client
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from('client_property_assignments')
+    .select('client_id')
+
+  if (assignmentsError) {
+    return { error: assignmentsError.message }
+  }
+
+  // Count properties per client
+  const propertyCounts: Record<string, number> = {}
+  assignments?.forEach((a: any) => {
+    propertyCounts[a.client_id] = (propertyCounts[a.client_id] || 0) + 1
+  })
+
+  // Merge property counts with client data
+  const clientsWithCounts = allClients?.map((client: any) => ({
+    ...client,
+    property_count: propertyCounts[client.id] || 0,
+    is_shared: false, // Not using shared concept in master view
+  })) || []
+
+  return { data: clientsWithCounts as ClientWithDetails[] }
+}
+
 export async function updateClientStatus(clientId: string, status: ClientStatus) {
   const supabase = await createClient()
 
@@ -640,6 +694,108 @@ export async function getClientShares(clientId: string): Promise<{ data: any[] |
   }
 
   return { data }
+}
+
+// Add a client to my list (for team members to add clients from All Clients view)
+export async function addClientToMyList(clientId: string): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  // Get the client and its owner
+  const { data: client, error: clientError } = await supabase
+    .from('clients')
+    .select('manager_id')
+    .eq('id', clientId)
+    .single()
+
+  if (clientError || !client) {
+    return { error: 'Client not found' }
+  }
+
+  // Check if already owner
+  if (client.manager_id === managerProfile.id) {
+    return { error: 'You already own this client' }
+  }
+
+  // Check if already shared with me
+  const { data: existingShare } = await supabase
+    .from('client_shares')
+    .select('id')
+    .eq('client_id', clientId)
+    .eq('shared_with_manager_id', managerProfile.id)
+    .single()
+
+  if (existingShare) {
+    return { error: 'This client is already in your list' }
+  }
+
+  // Create the share (owner shares with current user)
+  const { error: shareError } = await supabase
+    .from('client_shares')
+    .insert({
+      client_id: clientId,
+      shared_with_manager_id: managerProfile.id,
+      shared_by_manager_id: client.manager_id,
+    })
+
+  if (shareError) {
+    return { error: shareError.message }
+  }
+
+  revalidatePath('/admin/clients')
+  revalidatePath('/admin/clients-all')
+  revalidatePath(`/admin/client/${clientId}`)
+  return { success: true }
+}
+
+// Remove a client from my list (only works for shared clients, not owned ones)
+export async function removeClientFromMyList(clientId: string): Promise<{ success?: boolean; error?: string }> {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  // Get the client and its owner
+  const { data: client, error: clientError } = await supabase
+    .from('clients')
+    .select('manager_id')
+    .eq('id', clientId)
+    .single()
+
+  if (clientError || !client) {
+    return { error: 'Client not found' }
+  }
+
+  // Check if user is the owner - can't remove owned clients
+  if (client.manager_id === managerProfile.id) {
+    return { error: 'You cannot remove a client you own. You can only delete it.' }
+  }
+
+  // Remove the share
+  const { error: deleteError } = await supabase
+    .from('client_shares')
+    .delete()
+    .eq('client_id', clientId)
+    .eq('shared_with_manager_id', managerProfile.id)
+
+  if (deleteError) {
+    return { error: deleteError.message }
+  }
+
+  revalidatePath('/admin/clients')
+  revalidatePath('/admin/clients-all')
+  revalidatePath(`/admin/client/${clientId}`)
+  return { success: true }
 }
 
 // Share a client with another manager

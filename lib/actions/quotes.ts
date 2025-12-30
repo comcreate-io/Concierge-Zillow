@@ -119,6 +119,107 @@ export async function getQuotes() {
   return { data: updatedQuotes as Quote[] }
 }
 
+// Get ALL quotes in the system (for master view - all team members can access)
+export async function getAllQuotesSystem(filterManagerId?: string) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // Build query
+  let query = supabase
+    .from('quotes')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  // Apply manager filter if provided
+  if (filterManagerId && filterManagerId !== 'all') {
+    query = query.eq('manager_id', filterManagerId)
+  }
+
+  const { data: quotes, error } = await query
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for expired quotes and update status
+  const now = new Date()
+  const updatedQuotes = quotes?.map((quote: any) => {
+    if (quote.status === 'sent' || quote.status === 'viewed') {
+      const expirationDate = new Date(quote.expiration_date)
+      if (expirationDate < now) {
+        return { ...quote, status: 'expired' as QuoteStatus }
+      }
+    }
+    return quote
+  }) || []
+
+  return { data: updatedQuotes }
+}
+
+// Get quotes for a specific client (by email only)
+export async function getQuotesByClient(clientEmail: string | null) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // If no email provided, return empty
+  if (!clientEmail) {
+    return { data: [] }
+  }
+
+  // Build query - search by email only
+  const { data: quotes, error } = await supabase
+    .from('quotes')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .eq('client_email', clientEmail)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for expired quotes and update status
+  const now = new Date()
+  const updatedQuotes = quotes?.map((quote: any) => {
+    if (quote.status === 'sent' || quote.status === 'viewed') {
+      const expirationDate = new Date(quote.expiration_date)
+      if (expirationDate < now) {
+        return { ...quote, status: 'expired' as QuoteStatus }
+      }
+    }
+    return quote
+  }) || []
+
+  return { data: updatedQuotes }
+}
+
 // Get single quote with service items
 export async function getQuoteById(quoteId: string) {
   const supabase = await createClient()

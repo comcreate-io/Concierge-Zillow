@@ -27,6 +27,13 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Plus,
   Search,
   Edit,
@@ -40,8 +47,10 @@ import {
   AlertCircle,
   Mail,
   Download,
+  UserCircle,
 } from 'lucide-react'
 import { Invoice, InvoiceStatus, deleteInvoice, sendInvoice } from '@/lib/actions/invoices'
+import { ManagerInfo } from '@/lib/actions/clients'
 import { formatCurrency } from '@/lib/utils'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
 
@@ -53,21 +62,47 @@ const statusConfig: Record<InvoiceStatus, { label: string; color: string; icon: 
   overdue: { label: 'Overdue', color: 'bg-red-500/20 text-red-300 border-red-500/30', icon: AlertCircle },
 }
 
-export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
+type InvoiceWithManager = Invoice & {
+  property_managers?: {
+    id: string
+    name: string
+    last_name?: string | null
+    email: string
+  }
+}
+
+type Props = {
+  invoices: InvoiceWithManager[]
+  managers?: ManagerInfo[]
+  showManagerFilter?: boolean
+}
+
+export function InvoicesList({ invoices, managers = [], showManagerFilter = false }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [managerFilter, setManagerFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
-  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
+  const [selectedInvoice, setSelectedInvoice] = useState<InvoiceWithManager | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
-  const filteredInvoices = invoices.filter(invoice =>
-    invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.client_email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const getManagerDisplayName = (manager: { name: string; last_name?: string | null } | undefined) => {
+    if (!manager) return 'Unknown'
+    return manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name
+  }
+
+  const filteredInvoices = invoices.filter(invoice => {
+    const matchesSearch =
+      invoice.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      invoice.client_email.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesManager = managerFilter === 'all' || invoice.property_managers?.id === managerFilter
+
+    return matchesSearch && matchesManager
+  })
 
   const handleDelete = async () => {
     if (!selectedInvoice) return
@@ -155,22 +190,41 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
   return (
     <div className="space-y-6">
       {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
-          <Input
-            placeholder="Search invoices..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+              <Input
+                placeholder="Search invoices..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50"
+              />
+            </div>
+            {showManagerFilter && managers.length > 0 && (
+              <Select value={managerFilter} onValueChange={setManagerFilter}>
+                <SelectTrigger className="w-full sm:w-[200px] bg-white/5 border-white/20 text-white">
+                  <SelectValue placeholder="Filter by manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Managers</SelectItem>
+                  {managers.map(manager => (
+                    <SelectItem key={manager.id} value={manager.id}>
+                      {manager.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <Link href="/admin/invoices/new">
+            <Button className="btn-luxury">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Invoice
+            </Button>
+          </Link>
         </div>
-        <Link href="/admin/invoices/new">
-          <Button className="btn-luxury">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Invoice
-          </Button>
-        </Link>
       </div>
 
       {/* Invoice Stats */}
@@ -224,6 +278,7 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead className="text-white/70">Invoice #</TableHead>
                     <TableHead className="text-white/70">Client</TableHead>
+                    {showManagerFilter && <TableHead className="text-white/70">Manager</TableHead>}
                     <TableHead className="text-white/70 text-right">Amount</TableHead>
                     <TableHead className="text-white/70">Status</TableHead>
                     <TableHead className="text-white/70">Due Date</TableHead>
@@ -248,6 +303,14 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                             <p className="text-sm text-white/60">{invoice.client_email}</p>
                           </div>
                         </TableCell>
+                        {showManagerFilter && (
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <UserCircle className="h-4 w-4 text-purple-400" />
+                              <span className="text-white/80">{getManagerDisplayName(invoice.property_managers)}</span>
+                            </div>
+                          </TableCell>
+                        )}
                         <TableCell className="text-right font-semibold text-white">
                           {formatCurrency(invoice.total)}
                         </TableCell>
@@ -362,6 +425,15 @@ export function InvoicesList({ invoices }: { invoices: Invoice[] }) {
                       <p className="font-medium text-white">{invoice.client_name}</p>
                       <p className="text-sm text-white/60">{invoice.client_email}</p>
                     </div>
+
+                    {/* Manager Info */}
+                    {showManagerFilter && invoice.property_managers && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <UserCircle className="h-4 w-4 text-purple-400" />
+                        <span className="text-white/70">Manager:</span>
+                        <span className="text-white">{getManagerDisplayName(invoice.property_managers)}</span>
+                      </div>
+                    )}
 
                     {/* Amount and Due Date */}
                     <div className="flex items-center justify-between pt-3 border-t border-white/10">

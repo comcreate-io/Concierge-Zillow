@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -35,7 +35,9 @@ import {
   Car,
   MapPin,
   Users,
+  ArrowLeft,
 } from 'lucide-react'
+import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { getQuoteByNumber, acceptQuote, declineQuote, QuoteWithItems, QuoteStatus } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
@@ -53,11 +55,17 @@ const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: an
 
 export default function QuoteViewPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const quoteNumber = params?.number as string
   const { toast } = useToast()
   const [quote, setQuote] = useState<QuoteWithItems | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Get back URL from search params
+  const from = searchParams.get('from')
+  const clientId = searchParams.get('clientId')
+  const backUrl = from === 'client' && clientId ? `/admin/client/${clientId}` : null
   const [acceptDialogOpen, setAcceptDialogOpen] = useState(false)
   const [declineDialogOpen, setDeclineDialogOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -454,6 +462,14 @@ export default function QuoteViewPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
+              {backUrl && (
+                <Link href={backUrl}>
+                  <Button variant="ghost" size="sm" className="text-white hover:text-white/80 mr-2">
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                </Link>
+              )}
               <div className="shimmer">
                 <Logo />
               </div>

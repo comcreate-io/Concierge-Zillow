@@ -101,6 +101,107 @@ export async function getInvoices() {
   return { data: updatedInvoices as Invoice[] }
 }
 
+// Get ALL invoices in the system (for master view - all team members can access)
+export async function getAllInvoicesSystem(filterManagerId?: string) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // Build query
+  let query = supabase
+    .from('invoices')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  // Apply manager filter if provided
+  if (filterManagerId && filterManagerId !== 'all') {
+    query = query.eq('manager_id', filterManagerId)
+  }
+
+  const { data: invoices, error } = await query
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for overdue invoices and update status
+  const now = new Date()
+  const updatedInvoices = invoices?.map((invoice: any) => {
+    if (invoice.status === 'sent' || invoice.status === 'viewed') {
+      const dueDate = new Date(invoice.due_date)
+      if (dueDate < now) {
+        return { ...invoice, status: 'overdue' as InvoiceStatus }
+      }
+    }
+    return invoice
+  }) || []
+
+  return { data: updatedInvoices }
+}
+
+// Get invoices for a specific client (by email only)
+export async function getInvoicesByClient(clientEmail: string | null) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // If no email provided, return empty
+  if (!clientEmail) {
+    return { data: [] }
+  }
+
+  // Build query - search by email only
+  const { data: invoices, error } = await supabase
+    .from('invoices')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .eq('client_email', clientEmail)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for overdue invoices and update status
+  const now = new Date()
+  const updatedInvoices = invoices?.map((invoice: any) => {
+    if (invoice.status === 'sent' || invoice.status === 'viewed') {
+      const dueDate = new Date(invoice.due_date)
+      if (dueDate < now) {
+        return { ...invoice, status: 'overdue' as InvoiceStatus }
+      }
+    }
+    return invoice
+  }) || []
+
+  return { data: updatedInvoices }
+}
+
 // Get single invoice with line items
 export async function getInvoiceById(invoiceId: string) {
   const supabase = await createClient()

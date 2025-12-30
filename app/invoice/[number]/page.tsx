@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,6 +16,7 @@ import {
   CreditCard,
   Building2,
   Download,
+  ArrowLeft,
 } from 'lucide-react'
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
@@ -34,11 +35,17 @@ const statusConfig: Record<InvoiceStatus, { label: string; color: string; icon: 
 
 export default function InvoiceViewPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const invoiceNumber = params?.number as string
   const [invoice, setInvoice] = useState<InvoiceWithLineItems | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { toast } = useToast()
+
+  // Get back URL from search params
+  const from = searchParams.get('from')
+  const clientId = searchParams.get('clientId')
+  const backUrl = from === 'client' && clientId ? `/admin/client/${clientId}` : null
 
   useEffect(() => {
     async function loadInvoice() {
@@ -127,6 +134,14 @@ export default function InvoiceViewPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
+              {backUrl && (
+                <Link href={backUrl}>
+                  <Button variant="ghost" size="sm" className="text-white hover:text-white/80 mr-2">
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Back
+                  </Button>
+                </Link>
+              )}
               <div className="shimmer">
                 <Logo />
               </div>

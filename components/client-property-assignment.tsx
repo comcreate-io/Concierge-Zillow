@@ -1435,29 +1435,29 @@ export function ClientPropertyAssignment({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
       {/* Assigned Properties Section */}
       <Card className="glass-card border-white/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">{clientName}'s Properties</CardTitle>
-              <CardDescription className="text-white/70">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="text-white text-base sm:text-lg truncate">{clientName}'s Properties</CardTitle>
+              <CardDescription className="text-white/70 text-xs sm:text-sm">
                 {assignedProperties.length} {assignedProperties.length === 1 ? 'property' : 'properties'} assigned
               </CardDescription>
             </div>
             {isSavingOrder && (
-              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
+              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 flex-shrink-0 text-xs">
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                 Saving...
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
           {assignedProperties.length === 0 ? (
-            <div className="text-center py-12">
-              <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
+            <div className="text-center py-8 sm:py-12">
+              <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
               <p className="text-white/60">No properties assigned yet</p>
               <p className="text-sm text-white/40 mt-1">Add properties from the available list</p>
             </div>
@@ -1491,32 +1491,109 @@ export function ClientPropertyAssignment({
                       : ''
                   } cursor-move hover:bg-white/5`}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Desktop Drag Handle */}
-                    <div className="hidden md:flex items-center justify-center w-8">
-                      <GripVertical className="h-5 w-5 text-white/50" />
-                    </div>
+                  {/* Mobile Layout */}
+                  <div className="md:hidden">
+                    <div className="flex items-start gap-3">
+                      {/* Mobile Move Buttons */}
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                          className="h-6 w-6 p-0 hover:bg-white/10"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleMoveDown(index)}
+                          disabled={index === assignedProperties.length - 1}
+                          className="h-6 w-6 p-0 hover:bg-white/10"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                    {/* Mobile Move Buttons */}
-                    <div className="flex md:hidden flex-col gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                        className="h-6 w-6 p-0 hover:bg-white/10"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === assignedProperties.length - 1}
-                        className="h-6 w-6 p-0 hover:bg-white/10"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
+                      {/* Property Image */}
+                      {firstImage && (
+                        <div className="w-20 h-20 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                          <img
+                            src={firstImage}
+                            alt={property.address || 'Property'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Content and Actions */}
+                      <div className="flex-1 min-w-0">
+                        {/* Address - full width, wrapping allowed */}
+                        <p className="text-white font-medium text-sm leading-tight mb-1">
+                          {property.address || 'Unknown Address'}
+                        </p>
+                        {/* Property specs */}
+                        <div className="flex flex-wrap gap-2 text-xs text-white/60 mb-2">
+                          {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                          {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                          {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                        </div>
+                        {/* Actions row */}
+                        <div className="flex gap-1.5">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!!isAssigning}
+                                className="h-7 w-7 p-0 hover:bg-white/10 text-white"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="bg-zinc-900 border-white/20">
+                              <DropdownMenuItem
+                                onClick={() => handleEditPricing(property)}
+                                className="text-white hover:bg-white/10 cursor-pointer"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Pricing Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="text-white hover:bg-white/10 cursor-pointer">
+                                <Link href={`/admin/properties/${property.id}/edit?returnTo=/admin/client/${clientId}`}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Property
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemove(property.id)}
+                            disabled={isAssigning === property.id}
+                            className="h-7 w-7 p-0 hover:bg-red-500/20 text-red-400"
+                          >
+                            {isAssigning === property.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop Layout */}
+                  <div className="hidden md:flex items-center gap-3">
+                    {/* Desktop Drag Handle */}
+                    <div className="flex items-center justify-center w-8">
+                      <GripVertical className="h-5 w-5 text-white/50" />
                     </div>
 
                     {/* Property Image */}
@@ -1596,11 +1673,11 @@ export function ClientPropertyAssignment({
 
       {/* Saved Properties Section */}
       <Card className="glass-card border-white/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">Saved Properties</CardTitle>
-              <CardDescription className="text-white/70">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-white text-base sm:text-lg">Saved Properties</CardTitle>
+              <CardDescription className="text-white/70 text-xs sm:text-sm">
                 {availableProperties.length} {availableProperties.length === 1 ? 'property' : 'properties'} available
               </CardDescription>
             </div>
@@ -1608,33 +1685,34 @@ export function ClientPropertyAssignment({
               <Button
                 size="sm"
                 onClick={handleOpenNewPropertyModal}
-                className="bg-white text-black hover:bg-white/90"
+                className="bg-white text-black hover:bg-white/90 text-xs sm:text-sm h-8 sm:h-9"
               >
-                <Plus className="h-4 w-4 mr-1" />
-                New Property
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden sm:inline">New Property</span>
+                <span className="sm:hidden">New</span>
               </Button>
               <Button
                 size="sm"
                 variant={isBulkMode ? 'default' : 'outline'}
                 onClick={toggleBulkMode}
-                className={isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}
+                className={`text-xs sm:text-sm h-8 sm:h-9 ${isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}`}
               >
                 {isBulkMode ? (
                   <>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Bulk Mode
+                    <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Bulk Mode</span>
                   </>
                 ) : (
                   <>
-                    <Square className="h-4 w-4 mr-2" />
-                    Bulk Select
+                    <Square className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Bulk Select</span>
                   </>
                 )}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
             <Input
@@ -1684,11 +1762,11 @@ export function ClientPropertyAssignment({
             </div>
           )}
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <div className="space-y-2 max-h-[400px] sm:max-h-[600px] overflow-y-auto">
             {filteredAvailable.length === 0 ? (
-              <div className="text-center py-12">
-                <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
-                <p className="text-white/60">
+              <div className="text-center py-8 sm:py-12">
+                <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
+                <p className="text-white/60 text-sm sm:text-base">
                   {searchQuery ? 'No properties match your search' : 'All properties have been assigned'}
                 </p>
               </div>
@@ -1705,7 +1783,64 @@ export function ClientPropertyAssignment({
                       isBulkMode ? 'cursor-pointer hover:bg-white/10' : ''
                     } ${isSelected ? 'ring-2 ring-blue-500 bg-blue-500/10' : ''}`}
                   >
-                    <div className="flex items-center gap-3">
+                    {/* Mobile Layout */}
+                    <div className="md:hidden">
+                      <div className="flex items-start gap-3">
+                        {/* Bulk Select Checkbox */}
+                        {isBulkMode && (
+                          <div className="flex-shrink-0 pt-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => togglePropertySelection(property.id)}
+                              className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                            />
+                          </div>
+                        )}
+
+                        {/* Property Image */}
+                        {firstImage && (
+                          <div className="w-20 h-20 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                            <img
+                              src={firstImage}
+                              alt={property.address || 'Property'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Content and Action */}
+                        <div className="flex-1 min-w-0">
+                          {/* Address - full width, wrapping allowed */}
+                          <p className="text-white font-medium text-sm leading-tight mb-1">
+                            {property.address || 'Unknown Address'}
+                          </p>
+                          {/* Property specs */}
+                          <div className="flex flex-wrap gap-2 text-xs text-white/60 mb-2">
+                            {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                            {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                            {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                          </div>
+                          {/* Add Button (only in single mode) */}
+                          {!isBulkMode && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleStartAssign(property)}
+                              disabled={!!isAssigning}
+                              className="h-7 px-3 bg-white text-black hover:bg-white/90 text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add to Client
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center gap-3">
                       {/* Bulk Select Checkbox */}
                       {isBulkMode && (
                         <div className="flex-shrink-0">

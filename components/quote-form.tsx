@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -22,6 +23,7 @@ import {
   Plane,
   Ship,
   Calendar,
+  Users,
 } from 'lucide-react'
 import { createQuote, updateQuote, QuoteWithItems } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
@@ -46,12 +48,20 @@ interface ServicePDFOverride {
   display_images: string[]
 }
 
+type ClientOption = {
+  id: string
+  name: string
+  email: string | null
+}
+
 interface QuoteFormProps {
   quote?: QuoteWithItems
   mode: 'create' | 'edit'
+  clients?: ClientOption[]
+  backUrl?: string
 }
 
-export function QuoteForm({ quote, mode }: QuoteFormProps) {
+export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes' }: QuoteFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null)
   const { toast } = useToast()
@@ -60,8 +70,21 @@ export function QuoteForm({ quote, mode }: QuoteFormProps) {
   const fileInputRefs = useRef<{ [key: number]: HTMLInputElement | null }>({})
 
   // Form state
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [clientName, setClientName] = useState(quote?.client_name || '')
   const [clientEmail, setClientEmail] = useState(quote?.client_email || '')
+
+  // Handle client selection from dropdown
+  const handleClientSelect = (clientId: string) => {
+    setSelectedClientId(clientId)
+    if (clientId) {
+      const client = clients.find(c => c.id === clientId)
+      if (client) {
+        setClientName(client.name)
+        setClientEmail(client.email || '')
+      }
+    }
+  }
   const [expirationDate, setExpirationDate] = useState<Date | null>(
     quote?.expiration_date ? new Date(quote.expiration_date) : null
   )
@@ -366,7 +389,7 @@ export function QuoteForm({ quote, mode }: QuoteFormProps) {
           : 'Quote has been saved as draft',
       })
 
-      router.push('/admin/quotes')
+      router.push(backUrl)
       router.refresh()
     } catch (error) {
       toast({
@@ -393,6 +416,32 @@ export function QuoteForm({ quote, mode }: QuoteFormProps) {
           <CardTitle className="text-white">Client Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Client Selector Dropdown */}
+          {clients.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="clientSelect" className="text-white/90 uppercase tracking-wide text-sm font-semibold flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Select Existing Client
+              </Label>
+              <Select value={selectedClientId} onValueChange={handleClientSelect}>
+                <SelectTrigger className="w-full h-12 bg-white/5 border-white/20 text-white">
+                  <SelectValue placeholder="-- Select a client or enter manually --" />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-900 border-white/20">
+                  {clients.map((client) => (
+                    <SelectItem
+                      key={client.id}
+                      value={client.id}
+                      className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer"
+                    >
+                      {client.name} {client.email ? `(${client.email})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="clientName" className="text-white/90">Client Name *</Label>

@@ -1,11 +1,15 @@
 import { QuotesList } from '@/components/quotes-list'
-import { getQuotes } from '@/lib/actions/quotes'
+import { getAllQuotesSystem } from '@/lib/actions/quotes'
+import { getAllManagers } from '@/lib/actions/clients'
 
 export default async function QuotesPage() {
-  const { data: quotes, error } = await getQuotes()
+  const [quotesResult, managersResult] = await Promise.all([
+    getAllQuotesSystem(),
+    getAllManagers()
+  ])
 
-  if (error) {
-    console.error('Error fetching quotes:', error)
+  if (quotesResult.error) {
+    console.error('Error fetching quotes:', quotesResult.error)
   }
 
   return (
@@ -14,12 +18,16 @@ export default async function QuotesPage() {
         <div>
           <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-wider sm:tracking-widest text-white">Quotes</h1>
           <p className="text-white/70 mt-1 sm:mt-2 tracking-wide text-sm sm:text-base">
-            Create and manage quotes for exotic cars, private jets, and other luxury services
+            View and manage all team quotes
           </p>
         </div>
       </div>
 
-      <QuotesList quotes={quotes || []} />
+      <QuotesList
+        quotes={quotesResult.data || []}
+        managers={managersResult.data || []}
+        showManagerFilter={true}
+      />
     </div>
   )
 }

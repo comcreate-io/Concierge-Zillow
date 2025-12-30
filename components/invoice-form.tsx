@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/hooks/use-toast'
 import {
   ArrowLeft,
@@ -23,6 +24,7 @@ import {
   Percent,
   Sparkles,
   ExternalLink,
+  Users,
 } from 'lucide-react'
 import Link from 'next/link'
 import { createInvoice, updateInvoice, InvoiceWithLineItems } from '@/lib/actions/invoices'
@@ -37,17 +39,38 @@ type LineItem = {
   unit_price: number
 }
 
-interface InvoiceFormProps {
-  invoice?: InvoiceWithLineItems
+type ClientOption = {
+  id: string
+  name: string
+  email: string | null
 }
 
-export function InvoiceForm({ invoice }: InvoiceFormProps) {
+interface InvoiceFormProps {
+  invoice?: InvoiceWithLineItems
+  clients?: ClientOption[]
+  backUrl?: string
+}
+
+export function InvoiceForm({ invoice, clients = [], backUrl = '/admin/invoices' }: InvoiceFormProps) {
   const router = useRouter()
   const { toast } = useToast()
   const isEditing = !!invoice
 
+  const [selectedClientId, setSelectedClientId] = useState<string>('')
   const [clientName, setClientName] = useState(invoice?.client_name || '')
   const [clientEmail, setClientEmail] = useState(invoice?.client_email || '')
+
+  // Handle client selection from dropdown
+  const handleClientSelect = (clientId: string) => {
+    setSelectedClientId(clientId)
+    if (clientId) {
+      const client = clients.find(c => c.id === clientId)
+      if (client) {
+        setClientName(client.name)
+        setClientEmail(client.email || '')
+      }
+    }
+  }
   const [dueDate, setDueDate] = useState<Date | null>(
     invoice?.due_date ? new Date(invoice.due_date) : null
   )
@@ -142,7 +165,7 @@ export function InvoiceForm({ invoice }: InvoiceFormProps) {
             title: 'Invoice updated',
             description: 'Your invoice has been saved.',
           })
-          router.push('/admin/invoices')
+          router.push(backUrl)
         }
       } else {
         const result = await createInvoice(data)
@@ -155,7 +178,7 @@ export function InvoiceForm({ invoice }: InvoiceFormProps) {
               ? `Invoice has been sent to ${clientEmail}`
               : 'Your invoice has been saved as a draft.',
           })
-          router.push('/admin/invoices')
+          router.push(backUrl)
         }
       }
     } catch (error) {
@@ -171,7 +194,7 @@ export function InvoiceForm({ invoice }: InvoiceFormProps) {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-6">
         <div className="flex items-center gap-4">
-          <Link href="/admin/invoices">
+          <Link href={backUrl}>
             <Button variant="ghost" className="text-white hover:text-white/80">
               <ArrowLeft className="h-5 w-5 mr-2" />
               Back
@@ -223,10 +246,36 @@ export function InvoiceForm({ invoice }: InvoiceFormProps) {
                 Client Information
               </CardTitle>
               <CardDescription className="text-white/70 tracking-wide">
-                Enter the client details for this invoice
+                Select an existing client or enter details manually
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Client Selector Dropdown */}
+              {clients.length > 0 && (
+                <div className="space-y-2">
+                  <Label htmlFor="clientSelect" className="text-white/90 uppercase tracking-wide text-sm font-semibold flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Select Existing Client
+                  </Label>
+                  <Select value={selectedClientId} onValueChange={handleClientSelect}>
+                    <SelectTrigger className="w-full h-12 bg-white/5 border-white/20 text-white">
+                      <SelectValue placeholder="-- Select a client or enter manually --" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-gray-900 border-white/20">
+                      {clients.map((client) => (
+                        <SelectItem
+                          key={client.id}
+                          value={client.id}
+                          className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer"
+                        >
+                          {client.name} {client.email ? `(${client.email})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="clientName" className="text-white/90 uppercase tracking-wide text-sm font-semibold">

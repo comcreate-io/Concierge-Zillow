@@ -27,6 +27,13 @@ import { useToast } from '@/hooks/use-toast'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Plus,
   Search,
   Edit,
@@ -44,8 +51,10 @@ import {
   Mail,
   Receipt,
   Pencil,
+  UserCircle,
 } from 'lucide-react'
 import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
+import { ManagerInfo } from '@/lib/actions/clients'
 import { formatCurrency } from '@/lib/utils'
 import { QuotePDFBuilderDialog } from './quote-pdf-builder-dialog'
 
@@ -58,11 +67,27 @@ const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: an
   expired: { label: 'Expired', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30', icon: AlertCircle },
 }
 
-export function QuotesList({ quotes }: { quotes: Quote[] }) {
+type QuoteWithManager = Quote & {
+  property_managers?: {
+    id: string
+    name: string
+    last_name?: string | null
+    email: string
+  }
+}
+
+type Props = {
+  quotes: QuoteWithManager[]
+  managers?: ManagerInfo[]
+  showManagerFilter?: boolean
+}
+
+export function QuotesList({ quotes, managers = [], showManagerFilter = false }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
+  const [managerFilter, setManagerFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [sendDialogOpen, setSendDialogOpen] = useState(false)
-  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
+  const [selectedQuote, setSelectedQuote] = useState<QuoteWithManager | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [isDuplicating, setIsDuplicating] = useState(false)
@@ -76,11 +101,21 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   const { toast } = useToast()
   const router = useRouter()
 
-  const filteredQuotes = quotes.filter(quote =>
-    quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quote.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    quote.client_email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  const getManagerDisplayName = (manager: { name: string; last_name?: string | null } | undefined) => {
+    if (!manager) return 'Unknown'
+    return manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name
+  }
+
+  const filteredQuotes = quotes.filter(quote => {
+    const matchesSearch =
+      quote.quote_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quote.client_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      quote.client_email.toLowerCase().includes(searchTerm.toLowerCase())
+
+    const matchesManager = managerFilter === 'all' || quote.property_managers?.id === managerFilter
+
+    return matchesSearch && matchesManager
+  })
 
   const handleDelete = async () => {
     if (!selectedQuote) return
@@ -239,22 +274,41 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
   return (
     <div className="space-y-6">
       {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
-          <Input
-            placeholder="Search quotes..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50"
-          />
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/50" />
+              <Input
+                placeholder="Search quotes..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 bg-white/5 border-white/20 text-white placeholder:text-white/50"
+              />
+            </div>
+            {showManagerFilter && managers.length > 0 && (
+              <Select value={managerFilter} onValueChange={setManagerFilter}>
+                <SelectTrigger className="w-full sm:w-[200px] bg-white/5 border-white/20 text-white">
+                  <SelectValue placeholder="Filter by manager" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Managers</SelectItem>
+                  {managers.map(manager => (
+                    <SelectItem key={manager.id} value={manager.id}>
+                      {manager.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+          <Link href="/admin/quotes/new">
+            <Button className="btn-luxury">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Quote
+            </Button>
+          </Link>
         </div>
-        <Link href="/admin/quotes/new">
-          <Button className="btn-luxury">
-            <Plus className="h-4 w-4 mr-2" />
-            Create Quote
-          </Button>
-        </Link>
       </div>
 
       {/* Quote Stats */}
@@ -304,6 +358,7 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                 <TableRow className="border-white/10 hover:bg-transparent">
                   <TableHead className="text-white/70">Quote #</TableHead>
                   <TableHead className="text-white/70">Client</TableHead>
+                  {showManagerFilter && <TableHead className="text-white/70">Manager</TableHead>}
                   <TableHead className="text-white/70 text-right">Total</TableHead>
                   <TableHead className="text-white/70">Status</TableHead>
                   <TableHead className="text-white/70">Expires</TableHead>
@@ -328,6 +383,14 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                           <p className="text-sm text-white/60">{quote.client_email}</p>
                         </div>
                       </TableCell>
+                      {showManagerFilter && (
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="h-4 w-4 text-purple-400" />
+                            <span className="text-white/80">{getManagerDisplayName(quote.property_managers)}</span>
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-semibold text-white">
                         {formatCurrency(quote.total)}
                       </TableCell>
@@ -514,6 +577,15 @@ export function QuotesList({ quotes }: { quotes: Quote[] }) {
                     <p className="font-medium text-white">{quote.client_name}</p>
                     <p className="text-sm text-white/60">{quote.client_email}</p>
                   </div>
+
+                  {/* Manager Info */}
+                  {showManagerFilter && quote.property_managers && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <UserCircle className="h-4 w-4 text-purple-400" />
+                      <span className="text-white/70">Manager:</span>
+                      <span className="text-white">{getManagerDisplayName(quote.property_managers)}</span>
+                    </div>
+                  )}
 
                   {/* Amount and Expiration Date */}
                   <div className="flex items-center justify-between pt-3 border-t border-white/10">
