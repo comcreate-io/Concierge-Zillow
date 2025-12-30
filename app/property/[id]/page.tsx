@@ -15,22 +15,31 @@ import {
   Calendar,
   Share2,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Mail,
+  Phone,
+  User
 } from "lucide-react"
+import { Instagram, Facebook, Linkedin, Twitter } from "lucide-react"
 import { Logo } from "@/components/logo"
 import Link from "next/link"
 import ReactMarkdown from "react-markdown"
 import { getPropertyById, Property as SupabaseProperty } from "@/lib/supabase"
 import { createClient } from "@/lib/supabase/client"
-import { formatCurrency, formatNumber, formatPropertyValue, isValidPropertyValue } from "@/lib/utils"
-import { PropertyContactForm } from "@/components/property-contact-form"
+import { formatCurrency, formatNumber, formatPropertyValue, isValidPropertyValue, formatPhoneNumber } from "@/lib/utils"
 
 interface PropertyManager {
   id: string
   name: string
+  last_name?: string
+  title?: string
   email: string
   phone?: string
   profile_picture_url?: string
+  instagram_url?: string
+  facebook_url?: string
+  linkedin_url?: string
+  twitter_url?: string
 }
 
 interface Property {
@@ -96,7 +105,7 @@ export default function PropertyListingPage() {
         if (clientId) {
           const supabase = createClient()
 
-          // Fetch both in parallel for better performance on mobile
+          // First fetch client and assignment
           const [assignmentResult, clientResult] = await Promise.all([
             supabase
               .from('client_property_assignments')
@@ -106,7 +115,7 @@ export default function PropertyListingPage() {
               .single(),
             supabase
               .from('clients')
-              .select('manager_id, property_managers(id, name, email, phone, profile_picture_url)')
+              .select('manager_id')
               .eq('id', clientId)
               .single()
           ])
@@ -119,8 +128,17 @@ export default function PropertyListingPage() {
             showPurchasePrice = showPurchasePrice && (assignment.show_purchase_price_to_client ?? true)
           }
 
-          if (clientResult.data?.property_managers) {
-            clientManager = clientResult.data.property_managers as any
+          // Fetch manager separately using manager_id
+          if (clientResult.data?.manager_id) {
+            const { data: managerData } = await supabase
+              .from('property_managers')
+              .select('id, name, last_name, title, email, phone, profile_picture_url, instagram_url, facebook_url, linkedin_url, twitter_url')
+              .eq('id', clientResult.data.manager_id)
+              .single()
+
+            if (managerData) {
+              clientManager = managerData as PropertyManager
+            }
           }
         }
 
@@ -644,11 +662,122 @@ export default function PropertyListingPage() {
           </Card>
         </div>
 
-        {/* Contact Form */}
-        <PropertyContactForm
-          propertyAddress={property.address}
-          managers={property.managers || []}
-        />
+        {/* Contact Section */}
+        {property.managers && property.managers.length > 0 && (() => {
+          const manager = property.managers[0]
+          const fullName = manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name
+          const hasSocialLinks = manager.instagram_url || manager.facebook_url || manager.linkedin_url || manager.twitter_url
+
+          return (
+            <div className="mb-8 sm:mb-10">
+              <Card className="glass-card-accent elevated-card border border-white/20">
+                <CardContent className="p-6 sm:p-8 md:p-10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-1 w-12 divider-accent"></div>
+                    <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Your Agent</h2>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
+                    {/* Profile Picture */}
+                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-white/10 border-2 border-white/30 flex items-center justify-center flex-shrink-0">
+                      {manager.profile_picture_url ? (
+                        <img
+                          src={manager.profile_picture_url}
+                          alt={fullName}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <User className="h-12 w-12 text-white/40" />
+                      )}
+                    </div>
+
+                    {/* Contact Info */}
+                    <div className="flex-1 text-center sm:text-left">
+                      <h3 className="text-xl sm:text-2xl font-bold text-white tracking-wide mb-1">
+                        {fullName}
+                      </h3>
+                      {manager.title && (
+                        <p className="text-white/60 text-sm mb-4">{manager.title}</p>
+                      )}
+
+                      {/* Contact Links */}
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 mb-4">
+                        {manager.email && (
+                          <a
+                            href={`mailto:${manager.email}`}
+                            className="flex items-center justify-center sm:justify-start gap-2 text-white/80 hover:text-white transition-colors"
+                          >
+                            <Mail className="h-4 w-4" />
+                            <span className="text-sm">{manager.email}</span>
+                          </a>
+                        )}
+                        {manager.phone && (
+                          <a
+                            href={`tel:${manager.phone}`}
+                            className="flex items-center justify-center sm:justify-start gap-2 text-white/80 hover:text-white transition-colors"
+                          >
+                            <Phone className="h-4 w-4" />
+                            <span className="text-sm">{formatPhoneNumber(manager.phone)}</span>
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Social Media Links */}
+                      {hasSocialLinks && (
+                        <div className="flex items-center justify-center sm:justify-start gap-4">
+                          {manager.instagram_url && (
+                            <a
+                              href={manager.instagram_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
+                              aria-label="Instagram"
+                            >
+                              <Instagram className="h-4 w-4" />
+                            </a>
+                          )}
+                          {manager.facebook_url && (
+                            <a
+                              href={manager.facebook_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
+                              aria-label="Facebook"
+                            >
+                              <Facebook className="h-4 w-4" />
+                            </a>
+                          )}
+                          {manager.linkedin_url && (
+                            <a
+                              href={manager.linkedin_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
+                              aria-label="LinkedIn"
+                            >
+                              <Linkedin className="h-4 w-4" />
+                            </a>
+                          )}
+                          {manager.twitter_url && (
+                            <a
+                              href={manager.twitter_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
+                              aria-label="Twitter"
+                            >
+                              <Twitter className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )
+        })()}
       </main>
     </div>
   )

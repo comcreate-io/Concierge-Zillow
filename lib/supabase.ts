@@ -104,10 +104,10 @@ export async function getPropertyById(id: string) {
     return null
   }
 
-  // Fetch property managers
+  // Fetch property managers with all contact info and social links
   const { data: assignments } = await supabase
     .from('property_manager_assignments')
-    .select('manager_id, property_managers(id, name, email, phone, profile_picture_url)')
+    .select('manager_id, property_managers(id, name, last_name, title, email, phone, profile_picture_url, instagram_url, facebook_url, linkedin_url, twitter_url)')
     .eq('property_id', id)
 
   const managers = assignments?.map((a: any) => a.property_managers).filter(Boolean) || []
