@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { User } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { Home, LogOut, Building2, UserCheck, User as UserIcon, FileText, Sparkles, Users } from 'lucide-react'
+import { Home, LogOut, Building2, UserCheck, User as UserIcon, FileText, Sparkles, Users, Contact } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export function AdminSidebar({ user }: { user: User }) {
@@ -45,6 +45,12 @@ export function AdminSidebar({ user }: { user: User }) {
       active: pathname === '/admin' || pathname === '/admin/properties' || pathname.startsWith('/admin/properties/')
     },
     {
+      label: 'Agents',
+      href: '/admin/agents',
+      icon: Contact,
+      active: pathname === '/admin/agents' || pathname.startsWith('/admin/agents/')
+    },
+    {
       label: 'Invoices',
       href: '/admin/invoices',
       icon: FileText,
@@ -63,7 +69,7 @@ export function AdminSidebar({ user }: { user: User }) {
       {/* Logo/Brand Section */}
       <div className="p-6 border-b border-white/10 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-white/10 rounded-lg backdrop-blur-sm border border-white/30 shadow-md">
+          <div className="p-2 bg-white/10 rounded-lg border border-white/30">
             <Building2 className="h-6 w-6 text-white" />
           </div>
           <div>
@@ -74,33 +80,23 @@ export function AdminSidebar({ user }: { user: User }) {
       </div>
 
       {/* Navigation Links */}
-      <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon
           return (
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-300",
-                "hover:bg-white/10 hover:border-white/20 hover:shadow-md",
-                "group relative overflow-hidden",
+                "flex items-center gap-3 px-4 py-3 rounded-lg",
                 item.active
-                  ? "bg-white/15 border border-white/40 shadow-lg"
-                  : "border border-transparent"
+                  ? "bg-white/15 border border-white/40 text-white"
+                  : "text-white/70 hover:bg-white/10 hover:text-white border border-transparent"
               )}
             >
-              {item.active && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-white to-white/70" />
-              )}
-              <Icon className={cn(
-                "h-5 w-5 transition-all duration-300",
-                item.active ? "text-white" : "text-white/70 group-hover:text-white"
-              )} />
-              <span className={cn(
-                "text-sm font-medium tracking-wide uppercase transition-all duration-300",
-                item.active ? "text-white" : "text-white/70 group-hover:text-white"
-              )}>
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              <span className="text-sm font-medium tracking-wide uppercase">
                 {item.label}
               </span>
             </Link>
@@ -117,10 +113,10 @@ export function AdminSidebar({ user }: { user: User }) {
         <Button
           onClick={handleLogout}
           variant="outline"
-          className="w-full border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white tracking-wide justify-start transition-all duration-300 group"
+          className="w-full border-white/30 hover:bg-white/10 hover:border-white/50 hover:text-white tracking-wide justify-start"
           size="default"
         >
-          <LogOut className="h-4 w-4 mr-3 group-hover:scale-110 transition-transform duration-300" />
+          <LogOut className="h-4 w-4 mr-3" />
           Logout
         </Button>
       </div>

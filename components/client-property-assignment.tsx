@@ -40,6 +40,7 @@ import { saveProperty } from '@/lib/supabase'
 import { assignPropertyToManagers } from '@/lib/actions/properties'
 import { getCurrentManagerProfile } from '@/lib/actions/clients'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { findOrCreateAgent, linkPropertyToAgent } from '@/lib/agents'
 
 type Property = {
   id: string
@@ -456,6 +457,22 @@ export function ClientPropertyAssignment({
     setIsCreatingProperty(true)
 
     try {
+      // Check if URL is a building/complex page (not supported by API)
+      const urlLower = zillowUrl.toLowerCase()
+      const isBuildingUrl = urlLower.includes('/apartments/') ||
+                           urlLower.includes('/b/') ||
+                           (urlLower.includes('zillow.com') && !urlLower.includes('_zpid'))
+
+      if (isBuildingUrl) {
+        setIsCreatingProperty(false)
+        toast({
+          title: 'Building URL Detected',
+          description: 'This appears to be an apartment building page. Please use a specific unit URL (ending in _zpid) or switch to Manual mode to add this property.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       const apiKey = process.env.NEXT_PUBLIC_HASDATA_API_KEY
       if (!apiKey) {
         throw new Error('HasData API key is not configured')
@@ -546,6 +563,14 @@ export function ClientPropertyAssignment({
         area = (propertyData.livingArea || propertyData.area || "").toString()
       }
 
+      // Extract agent info (backend only - not displayed to clients)
+      const agentName = propertyData.agentName || null
+      const agentPhone = propertyData.agentPhoneNumber || null
+      const agentEmail = Array.isArray(propertyData.agentEmails) && propertyData.agentEmails.length > 0
+        ? propertyData.agentEmails[0]
+        : null
+      const brokerName = propertyData.brokerName || null
+
       // Get images
       let zillowImageUrls: string[] = []
       const rawPhotos = propertyData.photos || propertyData.images || []
@@ -617,9 +642,31 @@ export function ClientPropertyAssignment({
         custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
         show_purchase_price: newPropertyData.show_purchase_price,
         custom_purchase_price: newPropertyData.custom_purchase_price || null,
+        // Agent info (backend only)
+        agent_name: agentName,
+        agent_phone: agentPhone,
+        agent_email: agentEmail,
+        broker_name: brokerName,
       }
 
       const savedProperty = await saveProperty(newProperty)
+
+      // Create/find agent and link to property
+      if (savedProperty.id && agentName && agentPhone) {
+        try {
+          const agentId = await findOrCreateAgent({
+            name: agentName,
+            phone: agentPhone,
+            email: agentEmail,
+            broker_name: brokerName,
+          })
+          if (agentId) {
+            await linkPropertyToAgent(savedProperty.id, agentId)
+          }
+        } catch (agentError) {
+          console.warn('Failed to create/link agent:', agentError)
+        }
+      }
 
       // Get current manager and assign property
       const { data: managerProfile } = await getCurrentManagerProfile()

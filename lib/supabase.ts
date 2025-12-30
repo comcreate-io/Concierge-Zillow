@@ -40,6 +40,11 @@ export interface Property {
   label_purchase_price?: string
   // Custom notes
   custom_notes?: string | null
+  // Agent info (backend only)
+  agent_name?: string | null
+  agent_phone?: string | null
+  agent_email?: string | null
+  broker_name?: string | null
 }
 
 export async function getProperties() {
@@ -125,6 +130,11 @@ export async function saveProperty(propertyData: {
   custom_nightly_rate?: number | null
   show_purchase_price?: boolean
   custom_purchase_price?: number | null
+  // Agent info (backend only)
+  agent_name?: string | null
+  agent_phone?: string | null
+  agent_email?: string | null
+  broker_name?: string | null
 }) {
   console.log('saveProperty called with:', propertyData)
 

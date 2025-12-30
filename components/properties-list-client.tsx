@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useRef } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -386,6 +387,7 @@ interface PropertiesListClientProps {
 }
 
 export function PropertiesListClient({ initialProperties, managers, assignments }: PropertiesListClientProps) {
+  const router = useRouter()
   const [properties, setProperties] = useState<Property[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
@@ -628,12 +630,13 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
             <Home className="h-3 w-3 mr-2" />
             {filteredProperties.length} {filteredProperties.length === 1 ? 'Property' : 'Properties'}
           </Badge>
-          <Link href="/admin/properties/new" className="w-full sm:w-auto">
-            <Button className="btn-luxury px-4 py-4 text-sm w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Property
-            </Button>
-          </Link>
+          <Button
+            onClick={() => router.push('/admin/properties/new')}
+            className="btn-luxury px-4 py-4 text-sm w-full sm:w-auto"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Property
+          </Button>
         </div>
       </div>
 
@@ -668,12 +671,13 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
           <Home className="h-16 w-16 text-white/40 mx-auto mb-6" />
           <h3 className="luxury-heading text-2xl font-semibold mb-3 tracking-[0.1em]">No Properties Yet</h3>
           <p className="text-white/70 mb-6">Add your first property to get started</p>
-          <Link href="/admin/properties/new">
-            <Button className="btn-luxury px-6 py-4">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Property
-            </Button>
-          </Link>
+          <Button
+            onClick={() => router.push('/admin/properties/new')}
+            className="btn-luxury px-6 py-4"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Add Property
+          </Button>
         </Card>
       ) : filteredProperties.length === 0 ? (
         <Card className="glass-card-accent p-12 text-center">

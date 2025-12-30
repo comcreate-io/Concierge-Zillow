@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Home, ArrowLeft, Save, Loader2, X, DollarSign, Settings } from "lucide-react"
+import { Home, ArrowLeft, Save, Loader2, X, DollarSign, Settings, User, Phone, Mail, Building2 } from "lucide-react"
 import { ImageDropZone } from "@/components/image-drop-zone"
 import { Checkbox } from "@/components/ui/checkbox"
 import { PropertyManagerSelect, PropertyManager } from "@/components/property-manager-select"
@@ -65,6 +65,14 @@ export default function EditPropertyPage() {
   const [isCustomizationOpen, setIsCustomizationOpen] = useState(false)
   const [customizationSettings, setCustomizationSettings] = useState<PropertyCustomization>({})
 
+  // Agent info (read-only, backend only)
+  const [agentInfo, setAgentInfo] = useState({
+    agent_name: "",
+    agent_phone: "",
+    agent_email: "",
+    broker_name: ""
+  })
+
   useEffect(() => {
     async function loadData() {
       setIsLoading(true)
@@ -117,6 +125,14 @@ export default function EditPropertyPage() {
         label_nightly_rate: property.label_nightly_rate || 'Nightly Rate',
         label_purchase_price: property.label_purchase_price || 'Purchase Price',
         custom_notes: property.custom_notes || null,
+      })
+
+      // Load agent info (backend only)
+      setAgentInfo({
+        agent_name: property.agent_name || "",
+        agent_phone: property.agent_phone || "",
+        agent_email: property.agent_email || "",
+        broker_name: property.broker_name || ""
       })
 
       // Load all property managers
@@ -477,25 +493,6 @@ export default function EditPropertyPage() {
           </CardContent>
         </Card>
 
-        {/* Images */}
-        <Card className="glass-card-accent elevated-card">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white">
-              Property Images
-            </CardTitle>
-            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
-              Tap or drag to upload images
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
-            <ImageDropZone
-              images={formData.images}
-              onImagesChange={handleImagesChange}
-              disabled={isSaving}
-            />
-          </CardContent>
-        </Card>
-
         {/* Property Managers */}
         <Card className="glass-card-accent elevated-card">
           <CardHeader className="p-4 sm:p-6">
@@ -511,6 +508,84 @@ export default function EditPropertyPage() {
               managers={propertyManagers}
               selectedManagerIds={selectedManagerIds}
               onSelectionChange={setSelectedManagerIds}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Listing Agent Info (Backend Only) */}
+        {(agentInfo.agent_name || agentInfo.agent_phone || agentInfo.agent_email || agentInfo.broker_name) && (
+          <Card className="glass-card-accent elevated-card">
+            <CardHeader className="p-4 sm:p-6">
+              <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white flex items-center">
+                <User className="h-5 w-5 sm:h-6 sm:w-6 mr-2 sm:mr-3 flex-shrink-0" />
+                Listing Agent
+              </CardTitle>
+              <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
+                Contact info from Zillow (not visible to clients)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {agentInfo.agent_name && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                    <User className="h-5 w-5 text-white flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-white/50 uppercase tracking-wide">Agent Name</p>
+                      <p className="text-white font-medium">{agentInfo.agent_name}</p>
+                    </div>
+                  </div>
+                )}
+                {agentInfo.agent_phone && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                    <Phone className="h-5 w-5 text-white flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-white/50 uppercase tracking-wide">Phone</p>
+                      <a href={`tel:${agentInfo.agent_phone}`} className="text-white font-medium hover:text-white/80 transition-colors">
+                        {agentInfo.agent_phone}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {agentInfo.agent_email && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                    <Mail className="h-5 w-5 text-white flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-white/50 uppercase tracking-wide">Email</p>
+                      <a href={`mailto:${agentInfo.agent_email}`} className="text-white font-medium hover:text-white/80 transition-colors break-all">
+                        {agentInfo.agent_email}
+                      </a>
+                    </div>
+                  </div>
+                )}
+                {agentInfo.broker_name && (
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                    <Building2 className="h-5 w-5 text-white flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-white/50 uppercase tracking-wide">Brokerage</p>
+                      <p className="text-white font-medium">{agentInfo.broker_name}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Images */}
+        <Card className="glass-card-accent elevated-card">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="luxury-heading text-xl sm:text-2xl md:text-3xl tracking-[0.1em] sm:tracking-[0.15em] text-white">
+              Property Images
+            </CardTitle>
+            <CardDescription className="text-white/70 text-sm sm:text-base tracking-wide">
+              Tap or drag to upload images
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+            <ImageDropZone
+              images={formData.images}
+              onImagesChange={handleImagesChange}
+              disabled={isSaving}
             />
           </CardContent>
         </Card>
