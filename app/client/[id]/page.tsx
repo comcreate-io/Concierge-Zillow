@@ -4,7 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PublicPropertyCard } from '@/components/public-property-card'
 import { Logo } from '@/components/logo'
-import { Mail, Phone, Home } from 'lucide-react'
+import { Mail, Phone, Home, XCircle } from 'lucide-react'
 import { Instagram, Facebook, Linkedin, Twitter } from 'lucide-react'
 import { formatPhoneNumber } from '@/lib/utils'
 import { trackClientAccess } from '@/lib/actions/clients'
@@ -72,8 +72,81 @@ export default async function ClientPublicPage({
     }
   }).filter(Boolean) || []) as any[]
 
+  // Function to categorize property by state/region
+  const categorizeProperty = (address: string): string => {
+    if (!address) return 'OTHER'
+    const upperAddress = address.toUpperCase()
+
+    // Check for California
+    if (upperAddress.includes(', CA') || upperAddress.includes(' CA ') ||
+        upperAddress.includes('CALIFORNIA') || upperAddress.endsWith(' CA')) {
+      return 'CA'
+    }
+
+    // Check for New York
+    if (upperAddress.includes(', NY') || upperAddress.includes(' NY ') ||
+        upperAddress.includes('NEW YORK') || upperAddress.endsWith(' NY')) {
+      return 'NYC'
+    }
+
+    // Check for Miami/Florida
+    if (upperAddress.includes(', FL') || upperAddress.includes(' FL ') ||
+        upperAddress.includes('FLORIDA') || upperAddress.includes('MIAMI') ||
+        upperAddress.endsWith(' FL')) {
+      return 'MIA'
+    }
+
+    // Check for international (no US state pattern or contains country names)
+    const usStates = ['AL', 'AK', 'AZ', 'AR', 'CO', 'CT', 'DE', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC']
+    const hasUSState = usStates.some(state =>
+      upperAddress.includes(`, ${state}`) || upperAddress.includes(` ${state} `) || upperAddress.endsWith(` ${state}`)
+    )
+
+    if (!hasUSState) {
+      return 'INTL'
+    }
+
+    return 'OTHER'
+  }
+
+  // Group properties by region
+  const groupedProperties = propertyList.reduce((acc: Record<string, any[]>, property) => {
+    const category = categorizeProperty(property.address || '')
+    if (!acc[category]) {
+      acc[category] = []
+    }
+    acc[category].push(property)
+    return acc
+  }, {})
+
+  // Define display order and labels
+  const regionOrder = ['CA', 'NYC', 'MIA', 'INTL', 'OTHER']
+  const regionLabels: Record<string, string> = {
+    'CA': 'California',
+    'NYC': 'New York',
+    'MIA': 'Miami',
+    'INTL': 'International',
+    'OTHER': 'Other Locations'
+  }
+
+  const isClosed = client.status === 'closed'
+
   return (
     <div className="min-h-screen marble-bg">
+      {/* Closed Banner */}
+      {isClosed && (
+        <div className="bg-red-900/80 border-b border-red-700/50 backdrop-blur-md">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+            <div className="flex items-center justify-center gap-3 text-white">
+              <XCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+              <span className="text-sm sm:text-base font-semibold tracking-wide uppercase">
+                This Portfolio Has Been Closed
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b border-white/10 backdrop-blur-md bg-black/20 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 sm:py-7 animate-fade-in">
@@ -110,9 +183,16 @@ export default async function ClientPublicPage({
                   </div>
                 )}
               </div>
-              <Badge variant="secondary" className="bg-white/15 text-white border-white/30 backdrop-blur-md text-base sm:text-xl px-5 sm:px-6 py-2 sm:py-3 shadow-lg">
-                {propertyList.length} {propertyList.length === 1 ? 'Property' : 'Properties'}
-              </Badge>
+              <div className="flex items-center gap-3">
+                {isClosed && (
+                  <Badge variant="destructive" className="bg-red-600/80 text-white border-red-500/50 backdrop-blur-md text-sm sm:text-base px-4 sm:px-5 py-2 sm:py-3 shadow-lg">
+                    Closed
+                  </Badge>
+                )}
+                <Badge variant="secondary" className="bg-white/15 text-white border-white/30 backdrop-blur-md text-base sm:text-xl px-5 sm:px-6 py-2 sm:py-3 shadow-lg">
+                  {propertyList.length} {propertyList.length === 1 ? 'Property' : 'Properties'}
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
@@ -164,15 +244,29 @@ export default async function ClientPublicPage({
             </CardContent>
           </Card>
         ) : (
-          <div className="animate-fade-in">
-            <h2 className="luxury-heading text-3xl font-bold mb-8 text-white tracking-[0.2em]">
-              Properties for {client.name}
-            </h2>
-            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-              {propertyList.map((property) => (
-                <PublicPropertyCard key={property.id} property={property} clientId={id} />
-              ))}
-            </div>
+          <div className="animate-fade-in space-y-12">
+            {regionOrder.map((region) => {
+              const properties = groupedProperties[region]
+              if (!properties || properties.length === 0) return null
+
+              return (
+                <div key={region}>
+                  <div className="flex items-center gap-4 mb-6">
+                    <h2 className="luxury-heading text-2xl sm:text-3xl font-bold text-white tracking-[0.15em] sm:tracking-[0.2em]">
+                      {regionLabels[region]}
+                    </h2>
+                    <Badge variant="secondary" className="bg-white/10 text-white/80 border-white/20 text-sm px-3 py-1">
+                      {properties.length} {properties.length === 1 ? 'Property' : 'Properties'}
+                    </Badge>
+                  </div>
+                  <div className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3">
+                    {properties.map((property: any) => (
+                      <PublicPropertyCard key={property.id} property={property} clientId={id} />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         )}
 

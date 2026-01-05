@@ -206,10 +206,14 @@ export default function AddPropertyPage() {
       const data = await response.json()
       const propertyData = data.property || data
 
-      let address = propertyData.addressRaw || ""
-      if (!address && typeof propertyData.address === 'object' && propertyData.address) {
+      // Build full address with city and state for proper categorization
+      let address = ""
+      if (typeof propertyData.address === 'object' && propertyData.address) {
         const addr = propertyData.address
         address = [addr.street, addr.city, `${addr.state} ${addr.zipcode}`].filter(Boolean).join(', ')
+      }
+      if (!address && propertyData.addressRaw) {
+        address = propertyData.addressRaw
       }
       if (!address) address = "Address not available"
 
@@ -232,6 +236,30 @@ export default function AddPropertyPage() {
         bedrooms = (propertyData.bedrooms || propertyData.beds || "").toString()
         bathrooms = (propertyData.bathrooms || propertyData.baths || "").toString()
         area = (propertyData.livingArea || propertyData.area || "").toString()
+      }
+
+      // Extract price from Zillow
+      let scrapedPrice: number | null = null
+      let isRental = false
+
+      const propertyStatus = (propertyData.status || propertyData.homeStatus || '').toString().toUpperCase()
+      if (propertyStatus.includes('RENT') ||
+          propertyData.listingSubType?.toLowerCase().includes('rent') ||
+          urlLower.includes('/rental/')) {
+        isRental = true
+        const rawPrice = propertyData.price || propertyData.rentZestimate || propertyData.rent || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
+      } else {
+        const rawPrice = propertyData.price || propertyData.listPrice || propertyData.zestimate || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
       }
 
       const agentName = propertyData.agentName || null
@@ -275,12 +303,14 @@ export default function AddPropertyPage() {
         zillow_url: url.trim(),
         images: cloudinaryImageUrls,
         description: propertyData.description || null,
-        show_monthly_rent: pricingOptions.show_monthly_rent,
-        custom_monthly_rent: pricingOptions.custom_monthly_rent ? Number(pricingOptions.custom_monthly_rent) : null,
+        // For rentals, auto-set monthly rent from scraped price
+        show_monthly_rent: isRental && scrapedPrice ? true : pricingOptions.show_monthly_rent,
+        custom_monthly_rent: isRental && scrapedPrice ? scrapedPrice : (pricingOptions.custom_monthly_rent ? Number(pricingOptions.custom_monthly_rent) : null),
         show_nightly_rate: pricingOptions.show_nightly_rate,
         custom_nightly_rate: pricingOptions.custom_nightly_rate ? Number(pricingOptions.custom_nightly_rate) : null,
-        show_purchase_price: pricingOptions.show_purchase_price,
-        custom_purchase_price: pricingOptions.custom_purchase_price ? Number(pricingOptions.custom_purchase_price) : null,
+        // For sales, auto-set purchase price from scraped price
+        show_purchase_price: !isRental && scrapedPrice ? true : pricingOptions.show_purchase_price,
+        custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (pricingOptions.custom_purchase_price ? Number(pricingOptions.custom_purchase_price) : null),
         agent_name: agentName,
         agent_phone: agentPhone,
         agent_email: agentEmail,

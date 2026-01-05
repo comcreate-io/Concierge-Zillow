@@ -131,6 +131,8 @@ export function ClientPropertyAssignment({
     area: string
     description?: string
     zillowUrl: string
+    scrapedPrice?: number | null
+    isRental?: boolean
   } | null>(null)
 
   
@@ -508,14 +510,14 @@ export function ClientPropertyAssignment({
       const data = await response.json()
       const propertyData = data.property || data
 
-      // Extract address
+      // Extract address - prefer full address with city/state for proper categorization
       let address = ""
-      if (propertyData.addressRaw) {
-        address = propertyData.addressRaw
-      } else if (typeof propertyData.address === 'object' && propertyData.address) {
+      if (typeof propertyData.address === 'object' && propertyData.address) {
         const addr = propertyData.address
         const parts = [addr.street, addr.city, `${addr.state} ${addr.zipcode}`].filter(Boolean)
         address = parts.join(', ')
+      } else if (propertyData.addressRaw) {
+        address = propertyData.addressRaw
       } else if (typeof propertyData.address === 'string') {
         address = propertyData.address
       } else if (propertyData.fullAddress) {
@@ -561,6 +563,34 @@ export function ClientPropertyAssignment({
         bedrooms = (propertyData.bedrooms || propertyData.beds || "").toString()
         bathrooms = (propertyData.bathrooms || propertyData.baths || "").toString()
         area = (propertyData.livingArea || propertyData.area || "").toString()
+      }
+
+      // Extract price from Zillow
+      let scrapedPrice: number | null = null
+      let isRental = false
+
+      // Check if it's a rental property (status can be "FOR_RENT", "FOR_SALE", etc.)
+      const propertyStatus = (propertyData.status || propertyData.homeStatus || '').toString().toUpperCase()
+
+      if (propertyStatus.includes('RENT') ||
+          propertyData.listingSubType?.toLowerCase().includes('rent') ||
+          urlLower.includes('/rental/')) {
+        isRental = true
+        // For rentals, get the rental price (price field contains monthly rent for rentals)
+        const rawPrice = propertyData.price || propertyData.rentZestimate || propertyData.rent || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
+      } else {
+        // For sale properties
+        const rawPrice = propertyData.price || propertyData.listPrice || propertyData.zestimate || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
       }
 
       // Extract agent info (backend only - not displayed to clients)
@@ -621,13 +651,16 @@ export function ClientPropertyAssignment({
           area,
           description: propertyData.description || undefined,
           zillowUrl: zillowUrl.trim(),
+          scrapedPrice,
+          isRental,
         })
         setShowNoImagesPrompt(true)
         setIsCreatingProperty(false)
         return
       }
 
-      // Save the property
+      // Save the property with scraped price
+      // Use scraped price if available, otherwise use user-entered values
       const newProperty = {
         address,
         bedrooms,
@@ -636,12 +669,14 @@ export function ClientPropertyAssignment({
         zillow_url: zillowUrl.trim(),
         images: cloudinaryImageUrls,
         description: propertyData.description || null,
-        show_monthly_rent: newPropertyData.show_monthly_rent,
-        custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
+        // For rentals, set monthly rent from scraped price
+        show_monthly_rent: isRental && scrapedPrice ? true : newPropertyData.show_monthly_rent,
+        custom_monthly_rent: isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_monthly_rent || null),
         show_nightly_rate: newPropertyData.show_nightly_rate,
         custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
-        show_purchase_price: newPropertyData.show_purchase_price,
-        custom_purchase_price: newPropertyData.custom_purchase_price || null,
+        // For sales, set purchase price from scraped price
+        show_purchase_price: !isRental && scrapedPrice ? true : newPropertyData.show_purchase_price,
+        custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_purchase_price || null),
         // Agent info (backend only)
         agent_name: agentName,
         agent_phone: agentPhone,
@@ -694,9 +729,9 @@ export function ClientPropertyAssignment({
         client_id: clientId,
         property_id: savedProperty.id,
         position: nextPosition,
-        show_monthly_rent_to_client: newPropertyData.show_monthly_rent ?? true,
+        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
         show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
-        show_purchase_price_to_client: newPropertyData.show_purchase_price ?? true,
+        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
       })
 
       // Generate AI description
@@ -826,8 +861,10 @@ export function ClientPropertyAssignment({
     setShowNoImagesPrompt(false)
     setIsCreatingProperty(true)
 
+    const { scrapedPrice, isRental } = scrapedDataForFallback
+
     try {
-      // Save the property without images
+      // Save the property without images, using scraped price
       const newProperty = {
         address: scrapedDataForFallback.address,
         bedrooms: scrapedDataForFallback.bedrooms,
@@ -836,12 +873,14 @@ export function ClientPropertyAssignment({
         zillow_url: scrapedDataForFallback.zillowUrl,
         images: [] as string[],
         description: scrapedDataForFallback.description || undefined,
-        show_monthly_rent: newPropertyData.show_monthly_rent,
-        custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
+        // For rentals, set monthly rent from scraped price
+        show_monthly_rent: isRental && scrapedPrice ? true : newPropertyData.show_monthly_rent,
+        custom_monthly_rent: isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_monthly_rent || null),
         show_nightly_rate: newPropertyData.show_nightly_rate,
         custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
-        show_purchase_price: newPropertyData.show_purchase_price,
-        custom_purchase_price: newPropertyData.custom_purchase_price || null,
+        // For sales, set purchase price from scraped price
+        show_purchase_price: !isRental && scrapedPrice ? true : newPropertyData.show_purchase_price,
+        custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_purchase_price || null),
       }
 
       const savedProperty = await saveProperty(newProperty)
@@ -871,9 +910,9 @@ export function ClientPropertyAssignment({
         client_id: clientId,
         property_id: savedProperty.id,
         position: nextPosition,
-        show_monthly_rent_to_client: newPropertyData.show_monthly_rent ?? true,
+        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
         show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
-        show_purchase_price_to_client: newPropertyData.show_purchase_price ?? true,
+        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
       })
 
       // Generate AI description

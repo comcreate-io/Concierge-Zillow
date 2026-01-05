@@ -136,8 +136,6 @@ export async function saveProperty(propertyData: {
   agent_email?: string | null
   broker_name?: string | null
 }) {
-  console.log('saveProperty called with:', propertyData)
-
   // Allow duplicate zillow_urls - different managers can add the same property with different pricing
   const { data, error } = await supabase
     .from('properties')
@@ -162,6 +160,5 @@ export async function saveProperty(propertyData: {
     throw new Error(error.message || 'Failed to save property')
   }
 
-  console.log('Property saved successfully:', data)
   return data as Property
 }
