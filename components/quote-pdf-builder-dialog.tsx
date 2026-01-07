@@ -65,6 +65,12 @@ export function QuotePDFBuilderDialog({
   const [headerSubtitle, setHeaderSubtitle] = useState('')
   const [headerIcon, setHeaderIcon] = useState<'plane' | 'car' | 'yacht' | 'none'>('plane')
 
+  // Route info (for jet quotes)
+  const [departureCode, setDepartureCode] = useState('')
+  const [departureCity, setDepartureCity] = useState('')
+  const [arrivalCode, setArrivalCode] = useState('')
+  const [arrivalCity, setArrivalCity] = useState('')
+
   // Service overrides - keyed by service item ID
   const [serviceOverrides, setServiceOverrides] = useState<{ [key: string]: ServiceOverrideState }>({})
 
@@ -82,6 +88,12 @@ export function QuotePDFBuilderDialog({
       setCustomNotes(existing?.custom_notes || quote.notes || '')
       setCustomTerms(existing?.custom_terms || '')
 
+      // Initialize route info
+      setDepartureCode(existing?.route?.departure_code || '')
+      setDepartureCity(existing?.route?.departure_city || '')
+      setArrivalCode(existing?.route?.arrival_code || '')
+      setArrivalCity(existing?.route?.arrival_city || '')
+
       // Initialize service overrides
       const overrides: { [key: string]: ServiceOverrideState } = {}
       quote.service_items.forEach((item, index) => {
@@ -91,6 +103,11 @@ export function QuotePDFBuilderDialog({
           display_description: existingOverride?.display_description || item.description || '',
           display_images: existingOverride?.display_images || item.images?.slice(0, 2) || [],
           details: existingOverride?.details || [],
+          // Jet-specific fields
+          jet_model: existingOverride?.jet_model || '',
+          passengers: existingOverride?.passengers || '',
+          flight_time: existingOverride?.flight_time || '',
+          services_list: existingOverride?.services_list || ['Crew & in-flight refreshments', 'VIP handling & concierge coordination'],
           expanded: index === 0, // First item expanded by default
         }
       })
@@ -112,6 +129,12 @@ export function QuotePDFBuilderDialog({
       header_title: headerTitle || undefined,
       header_subtitle: headerSubtitle || undefined,
       header_icon: headerIcon,
+      route: (departureCode || departureCity || arrivalCode || arrivalCity) ? {
+        departure_code: departureCode || undefined,
+        departure_city: departureCity || undefined,
+        arrival_code: arrivalCode || undefined,
+        arrival_city: arrivalCity || undefined,
+      } : undefined,
       service_overrides: Object.keys(serviceOverridesClean).length > 0 ? serviceOverridesClean : undefined,
       custom_notes: customNotes || undefined,
       custom_terms: customTerms || undefined,
@@ -121,33 +144,46 @@ export function QuotePDFBuilderDialog({
   const handleSave = async () => {
     setIsSaving(true)
 
-    const customization = buildCustomization()
+    try {
+      const customization = buildCustomization()
 
-    const result = await updateQuotePDFCustomization(quote.id, customization)
+      const result = await updateQuotePDFCustomization(quote.id, customization)
 
-    if (result.error) {
+      if (result.error) {
+        toast({
+          title: 'Error',
+          description: result.error,
+          variant: 'destructive',
+        })
+      } else {
+        toast({
+          title: 'Success',
+          description: 'PDF customization saved successfully',
+        })
+        onSave?.(customization)
+        router.refresh()
+        onClose()
+      }
+    } catch (error) {
+      console.error('Error saving customization:', error)
       toast({
         title: 'Error',
-        description: result.error,
+        description: 'Failed to save customization. Please try again.',
         variant: 'destructive',
       })
-    } else {
-      toast({
-        title: 'Success',
-        description: 'PDF customization saved successfully',
-      })
-      onSave?.(customization)
-      router.refresh()
-      onClose()
+    } finally {
+      setIsSaving(false)
     }
-
-    setIsSaving(false)
   }
 
   const handleReset = () => {
     setHeaderTitle('')
     setHeaderSubtitle('')
     setHeaderIcon('plane')
+    setDepartureCode('')
+    setDepartureCity('')
+    setArrivalCode('')
+    setArrivalCity('')
     setCustomNotes(quote.notes || '')
     setCustomTerms('')
 
@@ -158,6 +194,10 @@ export function QuotePDFBuilderDialog({
         display_description: item.description || '',
         display_images: item.images?.slice(0, 2) || [],
         details: [],
+        jet_model: '',
+        passengers: '',
+        flight_time: '',
+        services_list: ['Crew & in-flight refreshments', 'VIP handling & concierge coordination'],
         expanded: index === 0,
       }
     })
@@ -167,6 +207,41 @@ export function QuotePDFBuilderDialog({
       title: 'Reset',
       description: 'Customization reset to defaults',
     })
+  }
+
+  // Helper to update services list
+  const updateServicesList = (serviceId: string, index: number, value: string) => {
+    setServiceOverrides(prev => {
+      const currentList = [...(prev[serviceId]?.services_list || [])]
+      currentList[index] = value
+      return {
+        ...prev,
+        [serviceId]: {
+          ...prev[serviceId],
+          services_list: currentList,
+        }
+      }
+    })
+  }
+
+  const addServiceItem = (serviceId: string) => {
+    setServiceOverrides(prev => ({
+      ...prev,
+      [serviceId]: {
+        ...prev[serviceId],
+        services_list: [...(prev[serviceId]?.services_list || []), ''],
+      }
+    }))
+  }
+
+  const removeServiceItem = (serviceId: string, index: number) => {
+    setServiceOverrides(prev => ({
+      ...prev,
+      [serviceId]: {
+        ...prev[serviceId],
+        services_list: prev[serviceId]?.services_list?.filter((_, i) => i !== index) || [],
+      }
+    }))
   }
 
   // Helper function to convert oklch/oklab colors to hex
@@ -238,23 +313,45 @@ export function QuotePDFBuilderDialog({
       }
 
       // Find the ticket preview element
-      const ticketElement = previewRef.current.querySelector('.max-w-\\[400px\\]') as HTMLElement
+      const ticketElement = previewRef.current.querySelector('.max-w-\\[420px\\]') as HTMLElement
 
       if (!ticketElement) {
         throw new Error('Could not find ticket preview element')
       }
 
-      // Wait for images to load
+      // Store original ticket styles and set fixed width for consistent PDF on all devices
+      const originalTicketStyle = ticketElement.style.cssText
+      ticketElement.style.width = '420px'
+      ticketElement.style.minWidth = '420px'
+      ticketElement.style.maxWidth = '420px'
+
+      // Wait for re-render with fixed width
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Preload the header image with CORS to ensure it's in browser cache
+      const headerImageUrl = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767127062/invoiceImage_lcy4qm.png'
+      await new Promise<void>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve()
+        img.onerror = () => resolve()
+        img.src = headerImageUrl
+      })
+
+      // Wait for all images in the element to load
       const images = ticketElement.querySelectorAll('img')
       await Promise.all(
         Array.from(images).map((img) => {
-          if (img.complete) return Promise.resolve()
+          if (img.complete && img.naturalHeight !== 0) return Promise.resolve()
           return new Promise((resolve) => {
             img.onload = resolve
             img.onerror = resolve
           })
         })
       )
+
+      // Small delay to ensure rendering is complete
+      await new Promise(resolve => setTimeout(resolve, 100))
 
       // Store original styles to restore later
       const originalStyles: Map<HTMLElement, string> = new Map()
@@ -286,6 +383,32 @@ export function QuotePDFBuilderDialog({
             el.style.borderColor = convertToHex(borderColor)
           }
         }
+
+        // Handle SVG elements separately
+        if (el instanceof SVGElement) {
+          const svgEl = el as SVGElement & { style: CSSStyleDeclaration }
+          originalStyles.set(el as unknown as HTMLElement, svgEl.style?.cssText || '')
+
+          const computed = window.getComputedStyle(el)
+
+          // Fix fill color
+          const fillColor = computed.fill
+          if (fillColor && fillColor !== 'none') {
+            svgEl.style.fill = convertToHex(fillColor)
+          }
+
+          // Fix stroke color
+          const strokeColor = computed.stroke
+          if (strokeColor && strokeColor !== 'none') {
+            svgEl.style.stroke = convertToHex(strokeColor)
+          }
+
+          // Fix color (for currentColor usage)
+          const color = computed.color
+          if (color) {
+            svgEl.style.color = convertToHex(color)
+          }
+        }
       })
 
       // Also fix the root element
@@ -306,13 +429,75 @@ export function QuotePDFBuilderDialog({
         }
       })
 
+      // Fix header image container with exact dimensions
+      const headerImageContainer = ticketElement.querySelector('.header-image-container')
+      if (headerImageContainer instanceof HTMLElement) {
+        const rect = headerImageContainer.getBoundingClientRect()
+        originalStyles.set(headerImageContainer, headerImageContainer.style.cssText)
+        headerImageContainer.style.width = rect.width + 'px'
+        headerImageContainer.style.height = rect.height + 'px'
+        headerImageContainer.style.minHeight = rect.height + 'px'
+        headerImageContainer.style.maxHeight = rect.height + 'px'
+        headerImageContainer.style.overflow = 'hidden'
+        headerImageContainer.style.display = 'block'
+        headerImageContainer.style.position = 'relative'
+
+        // Fix the header image itself - simulate object-fit: cover
+        const headerImg = headerImageContainer.querySelector('img[alt="Header"]')
+        if (headerImg instanceof HTMLImageElement) {
+          originalStyles.set(headerImg, headerImg.style.cssText)
+
+          // Calculate dimensions to simulate object-fit: cover
+          const containerWidth = rect.width
+          const containerHeight = rect.height
+          const imgNaturalWidth = headerImg.naturalWidth || containerWidth
+          const imgNaturalHeight = headerImg.naturalHeight || containerHeight
+          const containerRatio = containerWidth / containerHeight
+          const imageRatio = imgNaturalWidth / imgNaturalHeight
+
+          if (imageRatio > containerRatio) {
+            // Image is wider - fit by height, center horizontally
+            const scaledWidth = containerHeight * imageRatio
+            headerImg.style.width = scaledWidth + 'px'
+            headerImg.style.height = containerHeight + 'px'
+            headerImg.style.marginLeft = -((scaledWidth - containerWidth) / 2) + 'px'
+            headerImg.style.marginTop = '0'
+          } else {
+            // Image is taller - fit by width, center vertically
+            const scaledHeight = containerWidth / imageRatio
+            headerImg.style.width = containerWidth + 'px'
+            headerImg.style.height = scaledHeight + 'px'
+            headerImg.style.marginTop = -((scaledHeight - containerHeight) / 2) + 'px'
+            headerImg.style.marginLeft = '0'
+          }
+
+          headerImg.style.objectFit = 'none'
+          headerImg.style.maxWidth = 'none'
+          headerImg.style.maxHeight = 'none'
+          headerImg.style.display = 'block'
+          headerImg.style.position = 'absolute'
+          headerImg.style.top = '0'
+          headerImg.style.left = '0'
+        }
+      }
+
       // Fix all images - handle logo and content images differently
+      // Skip header image as it was already handled above
       const allImgs = ticketElement.querySelectorAll('img')
       allImgs.forEach((img) => {
         if (img instanceof HTMLImageElement) {
+          // Skip header image - already handled with specific styles
+          if (img.alt === 'Header') {
+            return
+          }
+
           const rect = img.getBoundingClientRect()
           const computed = window.getComputedStyle(img)
-          originalStyles.set(img, img.style.cssText)
+
+          // Only set original styles if not already set (header container children)
+          if (!originalStyles.has(img)) {
+            originalStyles.set(img, img.style.cssText)
+          }
 
           // Check if this is the logo (in the header with object-contain)
           const isLogo = computed.objectFit === 'contain' || img.alt === 'Cadiz & Lluis'
@@ -328,7 +513,7 @@ export function QuotePDFBuilderDialog({
             // For content images: html2canvas doesn't support object-fit well
             // We need to use a different approach - set explicit dimensions
             const parent = img.parentElement
-            if (parent) {
+            if (parent && !parent.classList.contains('header-image-container')) {
               const parentRect = parent.getBoundingClientRect()
               // Calculate the aspect ratio to simulate object-cover
               const imgNaturalWidth = img.naturalWidth || rect.width
@@ -424,6 +609,21 @@ export function QuotePDFBuilderDialog({
         }
       })
 
+      // Fix aircraft specs bar text - move up more
+      const aircraftSpecsBars = ticketElement.querySelectorAll('.aircraft-specs-bar')
+      aircraftSpecsBars.forEach((bar) => {
+        if (bar instanceof HTMLElement) {
+          // Move all text elements including nested ones
+          const allTextInBar = bar.querySelectorAll('*')
+          allTextInBar.forEach((el) => {
+            if (el instanceof HTMLElement && (el.tagName === 'H3' || el.tagName === 'P' || el.tagName === 'SPAN')) {
+              el.style.position = 'relative'
+              el.style.top = '-7px'
+            }
+          })
+        }
+      })
+
       // Capture with html2canvas
       const canvas = await html2canvas(ticketElement, {
         backgroundColor: '#ffffff',
@@ -456,6 +656,9 @@ export function QuotePDFBuilderDialog({
       originalStyles.forEach((originalStyle, el) => {
         el.style.cssText = originalStyle
       })
+
+      // Restore original ticket element style
+      ticketElement.style.cssText = originalTicketStyle
 
       // Create PDF with custom page size
       const imgWidth = canvas.width
@@ -666,65 +869,48 @@ export function QuotePDFBuilderDialog({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="glass-card-accent border-white/20 text-white w-[98vw] !max-w-[98vw] h-[98vh] !max-h-[98vh] p-0 flex flex-col">
-        <DialogHeader className="space-y-2 pb-4 border-b border-white/10 px-6 pt-6">
-          <DialogTitle className="luxury-heading text-2xl sm:text-3xl tracking-[0.1em] text-white flex items-center gap-3">
-            <FileText className="h-6 w-6" />
-            Customize Quote PDF
+        <DialogHeader className="space-y-1 sm:space-y-2 pb-3 sm:pb-4 border-b border-white/10 px-4 sm:px-6 pt-4 sm:pt-6">
+          <DialogTitle className="luxury-heading text-lg sm:text-2xl md:text-3xl tracking-[0.1em] text-white flex items-center gap-2 sm:gap-3">
+            <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+            <span className="hidden sm:inline">Customize Quote PDF</span>
+            <span className="sm:hidden">Quote PDF</span>
           </DialogTitle>
-          <DialogDescription className="text-white/70 text-sm tracking-wide">
+          <DialogDescription className="text-white/70 text-xs sm:text-sm tracking-wide hidden sm:block">
             Customize the visual layout and content of your quote PDF before sending
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1 min-h-0">
-          <TabsList className="grid grid-cols-2 bg-white/5 border border-white/10 mx-6 mt-4 w-auto">
-            <TabsTrigger value="settings" className="data-[state=active]:bg-white/20 text-white">
-              <Settings className="h-4 w-4 mr-2" />
-              Edit Content
+          <TabsList className="grid grid-cols-2 bg-white/5 border border-white/10 mx-4 sm:mx-6 mt-3 sm:mt-4 w-auto">
+            <TabsTrigger value="settings" className="data-[state=active]:bg-white/20 text-white text-xs sm:text-sm py-2">
+              <Settings className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Edit Content</span>
             </TabsTrigger>
-            <TabsTrigger value="preview" className="data-[state=active]:bg-white/20 text-white">
-              <Eye className="h-4 w-4 mr-2" />
-              Live Preview
+            <TabsTrigger value="preview" className="data-[state=active]:bg-white/20 text-white text-xs sm:text-sm py-2">
+              <Eye className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Live Preview</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="settings" className="mt-0 overflow-y-auto flex-1 px-6 py-4">
-            <div className="space-y-6">
-              {/* Header Section */}
-              <div className="space-y-4 p-4 glass-card-accent rounded-xl border border-white/10">
-                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                  Header Customization
+          <TabsContent value="settings" className="mt-0 overflow-y-auto flex-1 px-4 sm:px-6 py-3 sm:py-4">
+            <div className="space-y-4 sm:space-y-6">
+              {/* Header & Route Section */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10">
+                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                  <Plane className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <span className="hidden sm:inline">Quote Header & Route</span>
+                  <span className="sm:hidden">Header & Route</span>
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-white/90 text-sm">Custom Title (optional)</Label>
-                    <Input
-                      value={headerTitle}
-                      onChange={(e) => setHeaderTitle(e.target.value)}
-                      placeholder="e.g., Private Jet Charter Proposal"
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-white/90 text-sm">Subtitle (optional)</Label>
-                    <Input
-                      value={headerSubtitle}
-                      onChange={(e) => setHeaderSubtitle(e.target.value)}
-                      placeholder="e.g., Exclusive Rates - Limited Time"
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                    />
-                  </div>
-                </div>
 
                 {/* Service Type Selector */}
                 <div className="space-y-2">
-                  <Label className="text-white/90 text-sm">Service Type</Label>
-                  <div className="flex flex-wrap gap-2">
+                  <Label className="text-white/90 text-xs sm:text-sm">Service Type</Label>
+                  <div className="grid grid-cols-4 sm:flex sm:flex-wrap gap-1.5 sm:gap-2">
                     {[
-                      { value: 'plane', label: 'Private Jet', icon: Plane },
-                      { value: 'yacht', label: 'Yacht', icon: Ship },
-                      { value: 'car', label: 'Car Service', icon: Car },
-                      { value: 'none', label: 'Other', icon: FileText },
+                      { value: 'plane', label: 'Jet', fullLabel: 'Private Jet', icon: Plane },
+                      { value: 'yacht', label: 'Yacht', fullLabel: 'Yacht', icon: Ship },
+                      { value: 'car', label: 'Car', fullLabel: 'Car Service', icon: Car },
+                      { value: 'none', label: 'Other', fullLabel: 'Other', icon: FileText },
                     ].map((option) => {
                       const Icon = option.icon
                       return (
@@ -732,25 +918,74 @@ export function QuotePDFBuilderDialog({
                           key={option.value}
                           type="button"
                           onClick={() => setHeaderIcon(option.value as 'plane' | 'car' | 'yacht' | 'none')}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-all ${
+                          className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 px-2 sm:px-4 py-2 sm:py-2 rounded-lg border transition-all ${
                             headerIcon === option.value
                               ? 'bg-white/20 border-white/40 text-white'
                               : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10'
                           }`}
                         >
                           <Icon className="h-4 w-4" />
-                          <span className="text-sm">{option.label}</span>
+                          <span className="text-[10px] sm:text-sm sm:hidden">{option.label}</span>
+                          <span className="text-sm hidden sm:inline">{option.fullLabel}</span>
                         </button>
                       )
                     })}
                   </div>
                 </div>
 
+                {/* Route Info - Only for Plane */}
+                {headerIcon === 'plane' && (
+                  <div className="space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t border-white/10">
+                    <Label className="text-white/90 text-xs sm:text-sm font-semibold">Flight Route</Label>
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label className="text-white/60 text-[10px] sm:text-xs">FROM Code</Label>
+                        <Input
+                          value={departureCode}
+                          onChange={(e) => setDepartureCode(e.target.value.toUpperCase())}
+                          placeholder="SCF"
+                          maxLength={4}
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/40 text-center text-base sm:text-lg font-bold uppercase"
+                        />
+                      </div>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label className="text-white/60 text-[10px] sm:text-xs">FROM City</Label>
+                        <Input
+                          value={departureCity}
+                          onChange={(e) => setDepartureCity(e.target.value)}
+                          placeholder="Scottsdale"
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/40 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label className="text-white/60 text-[10px] sm:text-xs">TO Code</Label>
+                        <Input
+                          value={arrivalCode}
+                          onChange={(e) => setArrivalCode(e.target.value.toUpperCase())}
+                          placeholder="LAS"
+                          maxLength={4}
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/40 text-center text-base sm:text-lg font-bold uppercase"
+                        />
+                      </div>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label className="text-white/60 text-[10px] sm:text-xs">TO City</Label>
+                        <Input
+                          value={arrivalCity}
+                          onChange={(e) => setArrivalCity(e.target.value)}
+                          placeholder="Las Vegas"
+                          className="bg-white/5 border-white/20 text-white placeholder:text-white/40 text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Service Items Section */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-white">Service Options</h3>
+              {/* Jet Options Section */}
+              <div className="space-y-3 sm:space-y-4">
+                <h3 className="text-base sm:text-lg font-semibold text-white">
+                  {headerIcon === 'plane' ? 'Aircraft Options' : 'Service Options'}
+                </h3>
 
                 {quote.service_items.map((item, index) => {
                   const override = serviceOverrides[item.id] || {}
@@ -759,76 +994,116 @@ export function QuotePDFBuilderDialog({
                   return (
                     <div
                       key={item.id}
-                      className="p-4 glass-card-accent rounded-xl border border-white/10"
+                      className="p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10"
                     >
                       {/* Collapsed Header */}
                       <button
                         type="button"
                         onClick={() => toggleServiceExpanded(item.id)}
-                        className="w-full flex items-center justify-between text-left"
+                        className="w-full flex items-center justify-between text-left gap-2"
                       >
-                        <div className="flex items-center gap-3">
-                          <span className="text-white/50 text-sm">Option {index + 1}</span>
-                          <span className="text-white font-medium">{override.display_name || item.service_name}</span>
-                          <span className="text-white/70">{formatCurrency(item.price)}</span>
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                          <span className="bg-white/20 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0">
+                            {String(index + 1).padStart(2, '0')}
+                          </span>
+                          <span className="text-white font-medium text-sm sm:text-base truncate">
+                            {override.display_name || item.service_name}
+                            {override.jet_model && <span className="text-white/60 ml-1 hidden sm:inline">{override.jet_model}</span>}
+                          </span>
+                          <span className="text-white/70 text-xs sm:text-sm shrink-0">{formatCurrency(override.price_override ?? item.price)}</span>
                         </div>
                         {isExpanded ? (
-                          <ChevronUp className="h-5 w-5 text-white/50" />
+                          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
                         ) : (
-                          <ChevronDown className="h-5 w-5 text-white/50" />
+                          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
                         )}
                       </button>
 
                       {/* Expanded Content */}
                       {isExpanded && (
-                        <div className="mt-4 space-y-4 pt-4 border-t border-white/10">
-                          {/* Display Name */}
-                          <div className="space-y-2">
-                            <Label className="text-white/90 text-sm">Display Name</Label>
-                            <Input
-                              value={override.display_name || ''}
-                              onChange={(e) => updateServiceOverride(item.id, 'display_name', e.target.value)}
-                              placeholder={item.service_name}
-                              className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
-                            />
-                          </div>
+                        <div className="mt-3 sm:mt-4 space-y-3 sm:space-y-4 pt-3 sm:pt-4 border-t border-white/10">
+                          {/* Aircraft Name & Model (for planes) */}
+                          {headerIcon === 'plane' ? (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+                              <div className="space-y-1.5 sm:space-y-2 sm:col-span-2">
+                                <Label className="text-white/90 text-xs sm:text-sm">Aircraft Name</Label>
+                                <Input
+                                  value={override.display_name || ''}
+                                  onChange={(e) => updateServiceOverride(item.id, 'display_name', e.target.value)}
+                                  placeholder="2022 LearJet"
+                                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1.5 sm:space-y-2">
+                                <Label className="text-white/90 text-xs sm:text-sm">Model</Label>
+                                <Input
+                                  value={override.jet_model || ''}
+                                  onChange={(e) => updateServiceOverride(item.id, 'jet_model', e.target.value)}
+                                  placeholder="45xr"
+                                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Label className="text-white/90 text-sm">Display Name</Label>
+                              <Input
+                                value={override.display_name || ''}
+                                onChange={(e) => updateServiceOverride(item.id, 'display_name', e.target.value)}
+                                placeholder={item.service_name}
+                                className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                              />
+                            </div>
+                          )}
 
-                          {/* Description */}
-                          <div className="space-y-2">
-                            <Label className="text-white/90 text-sm">Description</Label>
-                            <Textarea
-                              value={override.display_description || ''}
-                              onChange={(e) => updateServiceOverride(item.id, 'display_description', e.target.value)}
-                              placeholder="Service description..."
-                              rows={3}
-                              className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
-                            />
-                          </div>
+                          {/* Passengers & Flight Time (for planes) */}
+                          {headerIcon === 'plane' && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-white/90 text-sm">Passengers</Label>
+                                <Input
+                                  value={override.passengers || ''}
+                                  onChange={(e) => updateServiceOverride(item.id, 'passengers', e.target.value)}
+                                  placeholder="8"
+                                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-white/90 text-sm">Flight Time</Label>
+                                <Input
+                                  value={override.flight_time || ''}
+                                  onChange={(e) => updateServiceOverride(item.id, 'flight_time', e.target.value)}
+                                  placeholder="3h 27m"
+                                  className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+                                />
+                              </div>
+                            </div>
+                          )}
 
-                          {/* Image Management Section */}
+                          {/* Images Section */}
                           <div className="space-y-3">
                             <Label className="text-white/90 text-sm flex items-center gap-2">
                               <ImageIcon className="h-4 w-4" />
-                              PDF Images
+                              {headerIcon === 'plane' ? 'Aircraft Images (Exterior + Interior)' : 'Images'}
                             </Label>
 
                             {/* Currently Selected Images */}
                             {override.display_images && override.display_images.length > 0 && (
                               <div className="space-y-2">
-                                <p className="text-xs text-white/50">Selected for PDF ({override.display_images.length}/2):</p>
-                                <div className="flex flex-wrap gap-2">
+                                <p className="text-xs text-white/50">Selected ({override.display_images.length}/2):</p>
+                                <div className="flex flex-wrap gap-3">
                                   {override.display_images.map((imageUrl, imgIndex) => (
                                     <div
                                       key={imgIndex}
-                                      className="relative w-24 h-24 rounded-lg overflow-hidden border-2 border-white group"
+                                      className="relative w-32 h-24 rounded-lg overflow-hidden border-2 border-white group"
                                     >
                                       <img
                                         src={imageUrl}
-                                        alt={`Selected ${imgIndex + 1}`}
+                                        alt={imgIndex === 0 ? 'Exterior' : 'Interior'}
                                         className="w-full h-full object-cover"
                                       />
-                                      <div className="absolute top-1 left-1 w-5 h-5 bg-white text-black rounded-full flex items-center justify-center text-xs font-bold">
-                                        {imgIndex + 1}
+                                      <div className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded">
+                                        {headerIcon === 'plane' ? (imgIndex === 0 ? 'Exterior' : 'Interior') : `Image ${imgIndex + 1}`}
                                       </div>
                                       <button
                                         type="button"
@@ -847,7 +1122,7 @@ export function QuotePDFBuilderDialog({
                             {item.images && item.images.length > 0 && (
                               <div className="space-y-2">
                                 <p className="text-xs text-white/50">Available images (click to add):</p>
-                                <div className="grid grid-cols-6 sm:grid-cols-8 gap-2">
+                                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
                                   {item.images
                                     .filter(img => !override.display_images?.includes(img))
                                     .map((imageUrl, imgIndex) => (
@@ -866,13 +1141,13 @@ export function QuotePDFBuilderDialog({
                                             }))
                                           } else {
                                             toast({
-                                              title: 'Maximum images reached',
+                                              title: 'Maximum 2 images',
                                               description: 'Remove an image first to add a new one',
                                               variant: 'destructive',
                                             })
                                           }
                                         }}
-                                        className="relative aspect-square rounded-lg overflow-hidden border-2 border-white/20 hover:border-white/50 transition-all"
+                                        className="relative aspect-video rounded-lg overflow-hidden border-2 border-white/20 hover:border-white/50 transition-all"
                                       >
                                         <img
                                           src={imageUrl}
@@ -914,154 +1189,80 @@ export function QuotePDFBuilderDialog({
                                 ) : (
                                   <>
                                     <Upload className="h-3 w-3 mr-1" />
-                                    Upload New Images
+                                    Upload Images
                                   </>
                                 )}
                               </Button>
-                              {(!override.display_images || override.display_images.length === 0) && (
-                                <p className="text-xs text-white/40">No images selected yet</p>
-                              )}
                             </div>
                           </div>
 
-                          {/* Custom Details */}
-                          <div className="space-y-3">
-                            <Label className="text-white/90 text-sm">Trip Details</Label>
-
-                            {/* Quick Add Buttons - Different options based on mode */}
-                            <div className="flex flex-wrap gap-2">
-                              {(headerIcon === 'plane' ? [
-                                { label: 'Date', placeholder: 'Friday, December 26th, 2025' },
-                                { label: 'Departure Code', placeholder: 'FXE' },
-                                { label: 'Departure', placeholder: 'Fort Lauderdale, FL' },
-                                { label: 'Arrival Code', placeholder: 'KASE' },
-                                { label: 'Arrival', placeholder: 'Aspen, CO' },
-                                { label: 'Duration', placeholder: '3h 34m' },
-                                { label: 'Passengers', placeholder: '8' },
-                              ] : headerIcon === 'yacht' ? [
-                                { label: 'Date', placeholder: 'Friday, December 26th, 2025' },
-                                { label: 'Departure Marina', placeholder: 'Miami Beach Marina' },
-                                { label: 'Destination', placeholder: 'Bahamas' },
-                                { label: 'Duration', placeholder: '3 Days' },
-                                { label: 'Guests', placeholder: '8' },
-                              ] : headerIcon === 'car' ? [
-                                { label: 'Date', placeholder: 'Friday, December 26th, 2025' },
-                                { label: 'Pickup', placeholder: 'Miami International Airport' },
-                                { label: 'Dropoff', placeholder: 'South Beach Hotel' },
-                                { label: 'Duration', placeholder: '4 Hours' },
-                                { label: 'Passengers', placeholder: '4' },
-                              ] : [
-                                { label: 'Date', placeholder: 'Friday, December 26th, 2025' },
-                                { label: 'Location', placeholder: 'Miami, FL' },
-                                { label: 'Duration', placeholder: '3 Hours' },
-                                { label: 'Guests', placeholder: '8' },
-                              ]).map((quickAdd) => {
-                                const exists = override.details?.some(d => d.label === quickAdd.label)
-                                if (exists) return null
-                                return (
-                                  <Button
-                                    key={quickAdd.label}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setServiceOverrides(prev => ({
-                                        ...prev,
-                                        [item.id]: {
-                                          ...prev[item.id],
-                                          details: [...(prev[item.id]?.details || []), { label: quickAdd.label, value: '' }],
-                                        }
-                                      }))
-                                    }}
-                                    className="text-xs border-white/20 text-white/70 hover:bg-white/10"
-                                  >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    {quickAdd.label}
-                                  </Button>
-                                )
-                              })}
-                              {/* Custom Field Button */}
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setServiceOverrides(prev => ({
-                                    ...prev,
-                                    [item.id]: {
-                                      ...prev[item.id],
-                                      details: [...(prev[item.id]?.details || []), { label: '', value: '' }],
-                                    }
-                                  }))
-                                }}
-                                className="text-xs border-dashed border-white/30 text-white/70 hover:bg-white/10"
-                              >
-                                <Plus className="h-3 w-3 mr-1" />
-                                Custom Field
-                              </Button>
-                            </div>
-
-                            {override.details && override.details.length > 0 && (
+                          {/* Services List (for planes) */}
+                          {headerIcon === 'plane' && (
+                            <div className="space-y-3">
+                              <Label className="text-white/90 text-sm">Included Services</Label>
                               <div className="space-y-2">
-                                {override.details.map((detail, detailIndex) => {
-                                  const allPresetFields = [
-                                    'Date', 'Departure Code', 'Departure', 'Arrival Code', 'Arrival', 'Duration', 'Passengers',
-                                    'Departure Marina', 'Destination', 'Guests', 'Pickup', 'Dropoff', 'Location'
-                                  ]
-                                  const isPresetField = allPresetFields.includes(detail.label)
-
-                                  return (
-                                    <div key={detailIndex} className="flex items-center gap-2">
-                                      {isPresetField ? (
-                                        <div className="w-32 text-sm text-white/70">{detail.label}</div>
-                                      ) : (
-                                        <Input
-                                          value={detail.label}
-                                          onChange={(e) => updateDetail(item.id, detailIndex, 'label', e.target.value)}
-                                          placeholder="Field name..."
-                                          className="w-32 bg-white/5 border-white/20 text-white placeholder:text-white/40 text-sm"
-                                        />
-                                      )}
-                                      <Input
-                                        value={detail.value}
-                                        onChange={(e) => updateDetail(item.id, detailIndex, 'value', e.target.value)}
-                                        placeholder={
-                                          detail.label === 'Date' ? 'Friday, December 26th, 2025' :
-                                          detail.label === 'Departure Code' ? 'FXE' :
-                                          detail.label === 'Departure' ? 'Fort Lauderdale, FL' :
-                                          detail.label === 'Arrival Code' ? 'KASE' :
-                                          detail.label === 'Arrival' ? 'Aspen, CO' :
-                                          detail.label === 'Duration' ? '3h 34m' :
-                                          detail.label === 'Passengers' ? '8' :
-                                          detail.label === 'Departure Marina' ? 'Miami Beach Marina' :
-                                          detail.label === 'Destination' ? 'Bahamas' :
-                                          detail.label === 'Guests' ? '8' :
-                                          detail.label === 'Pickup' ? 'Miami International Airport' :
-                                          detail.label === 'Dropoff' ? 'South Beach Hotel' :
-                                          detail.label === 'Location' ? 'Miami, FL' :
-                                          'Enter value...'
-                                        }
-                                        className="bg-white/5 border-white/20 text-white placeholder:text-white/40 flex-1"
-                                      />
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeDetail(item.id, detailIndex)}
-                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )
-                                })}
+                                {(override.services_list || []).map((service, svcIndex) => (
+                                  <div key={svcIndex} className="flex items-center gap-2">
+                                    <span className="text-white/50">•</span>
+                                    <Input
+                                      value={service}
+                                      onChange={(e) => updateServicesList(item.id, svcIndex, e.target.value)}
+                                      placeholder="Service description..."
+                                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 flex-1"
+                                    />
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => removeServiceItem(item.id, svcIndex)}
+                                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8"
+                                    >
+                                      <Trash2 className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => addServiceItem(item.id)}
+                                  className="text-xs border-dashed border-white/30 text-white/70 hover:bg-white/10"
+                                >
+                                  <Plus className="h-3 w-3 mr-1" />
+                                  Add Service
+                                </Button>
                               </div>
-                            )}
+                            </div>
+                          )}
 
-                            {(!override.details || override.details.length === 0) && (
-                              <p className="text-white/40 text-sm">Click the buttons above to add trip details for the ticket-style layout.</p>
-                            )}
+                          {/* Price Override */}
+                          <div className="space-y-2">
+                            <Label className="text-white/90 text-sm">Price</Label>
+                            <div className="relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">$</span>
+                              <Input
+                                type="number"
+                                value={override.price_override ?? item.price}
+                                onChange={(e) => updateServiceOverride(item.id, 'price_override', e.target.value ? Number(e.target.value) : undefined)}
+                                placeholder={item.price.toString()}
+                                className="bg-white/5 border-white/20 text-white placeholder:text-white/40 pl-7"
+                              />
+                            </div>
                           </div>
+
+                          {/* Description (for non-plane types) */}
+                          {headerIcon !== 'plane' && (
+                            <div className="space-y-2">
+                              <Label className="text-white/90 text-sm">Description</Label>
+                              <Textarea
+                                value={override.display_description || ''}
+                                onChange={(e) => updateServiceOverride(item.id, 'display_description', e.target.value)}
+                                placeholder="Service description..."
+                                rows={3}
+                                className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1070,358 +1271,230 @@ export function QuotePDFBuilderDialog({
               </div>
 
               {/* Notes Section */}
-              <div className="space-y-4 p-4 glass-card-accent rounded-xl border border-white/10">
-                <h3 className="text-lg font-semibold text-white">Notes & Terms</h3>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-white/90 text-sm">Custom Notes</Label>
-                    <Textarea
-                      value={customNotes}
-                      onChange={(e) => setCustomNotes(e.target.value)}
-                      placeholder="Add any notes for the client..."
-                      rows={3}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-white/90 text-sm">Custom Terms & Conditions (optional)</Label>
-                    <Textarea
-                      value={customTerms}
-                      onChange={(e) => setCustomTerms(e.target.value)}
-                      placeholder="Leave empty to use default terms..."
-                      rows={3}
-                      className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
-                    />
-                  </div>
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10">
+                <h3 className="text-base sm:text-lg font-semibold text-white">Notes</h3>
+                <div className="space-y-2">
+                  <Textarea
+                    value={customNotes}
+                    onChange={(e) => setCustomNotes(e.target.value)}
+                    placeholder="Add any notes for the client..."
+                    rows={3}
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none text-sm"
+                  />
                 </div>
               </div>
             </div>
           </TabsContent>
 
-          <TabsContent value="preview" className="mt-0 flex-1 min-h-0 px-6 py-4">
+          <TabsContent value="preview" className="mt-0 flex-1 min-h-0 px-2 sm:px-6 py-2 sm:py-4">
             <div className="h-full rounded-xl overflow-hidden border border-white/20 bg-white">
               <div ref={previewRef} className="h-full overflow-y-auto p-6" style={{ backgroundColor: '#f8f8f8' }}>
-                {/* PDF Preview - Ticket Style */}
-                <div className="max-w-[400px] mx-auto bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-                  {/* Top Header with Logo - Navy Blue */}
-                  <div className="bg-gray-900 px-5 py-4 flex items-center justify-between">
+                {/* PDF Preview - Jet Quote Style */}
+                <div className="max-w-[420px] mx-auto bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+                  {/* Header Image with Logo */}
+                  <div className="header-image-container relative" style={{ width: '100%', height: '220px', overflow: 'hidden' }}>
                     <img
-                      src="/logo/CL White LOGO.png"
-                      alt="Cadiz & Lluis"
-                      className="h-10 w-auto object-contain"
+                      src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767797886/quoteCover_qmol4g.jpg"
+                      alt="Header"
+                      crossOrigin="anonymous"
+                      style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
                     />
-                    <div className="text-right">
-                      <p className="text-[10px] text-white/60 uppercase tracking-wider">{quote.quote_number}</p>
-                      <p className="text-[9px] text-white/50">
-                        {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
+                    {/* Logo Overlay */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="text-center">
+                        <img
+                          src="/logo/CL Balck LOGO .png"
+                          alt="Cadiz & Lluis"
+                          className="h-16 w-auto object-contain"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Title Header - White Background */}
-                  <div className="bg-white p-4 text-center border-b border-gray-100">
-                    <h1 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-                      {headerTitle || 'Private Quotes'}
+                  {/* Title Section */}
+                  <div className="bg-white py-6 text-center">
+                    {/* Line separator */}
+                    <div className="w-32 h-0.5 bg-gray-800 mx-auto mb-4"></div>
+                    <h1 className="text-xl font-semibold text-gray-900 tracking-[0.2em] uppercase">
+                      {headerIcon === 'plane' ? 'PRIVATE JET PROPOSAL' :
+                       headerIcon === 'yacht' ? 'YACHT CHARTER PROPOSAL' :
+                       headerIcon === 'car' ? 'LUXURY CAR SERVICE' :
+                       headerTitle || 'SERVICE PROPOSAL'}
                     </h1>
-                    {headerSubtitle && (
-                      <p className="text-xs text-gray-500 mt-1">{headerSubtitle}</p>
+                  </div>
+
+                  {/* Boarding Pass Header */}
+                  {headerIcon === 'plane' && (
+                    <div className="bg-gray-800 px-5 py-3">
+                      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest">
+                        <span className="text-white font-medium">Boarding Pass · Private Charter</span>
+                        <span className="text-white">Exclusive Rates</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Client Info & Route Section */}
+                  <div className="bg-white px-5 py-4 border-b border-gray-100">
+                    <div className="flex justify-between items-start mb-6">
+                      <div>
+                        <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Prepared for:</p>
+                        <p className="text-sm font-semibold text-gray-900">{quote.client_name}</p>
+                        <p className="text-xs text-gray-500">{quote.client_email}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Date:</p>
+                        <p className="text-sm font-semibold text-gray-900">
+                          {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                        </p>
+                        <p className="text-xs text-gray-500">{quote.quote_number}</p>
+                      </div>
+                    </div>
+
+                    {/* Route Display */}
+                    {headerIcon === 'plane' && (departureCode || arrivalCode) && (
+                      <div className="flex items-center justify-center gap-4 py-4">
+                        <div className="text-center">
+                          <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">From</p>
+                          <p className="text-2xl font-bold text-gray-900">{departureCode || '---'}</p>
+                          <p className="text-[10px] text-gray-500 mt-1">{departureCity || 'Departure'}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <div className="w-8 border-t-2 border-dashed border-gray-300"></div>
+                          <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                          </svg>
+                          <div className="w-8 border-t-2 border-dashed border-gray-300"></div>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">To</p>
+                          <p className="text-2xl font-bold text-gray-900">{arrivalCode || '---'}</p>
+                          <p className="text-[10px] text-gray-500 mt-1">{arrivalCity || 'Arrival'}</p>
+                        </div>
+                      </div>
                     )}
                   </div>
 
-                  {/* Client Info */}
-                  <div className="bg-white px-5 pt-3 pb-6 border-b border-gray-100">
-                    <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Prepared For</p>
-                    <p className="text-sm font-semibold text-gray-900">{quote.client_name}</p>
-                    <p className="text-xs text-gray-500">{quote.client_email}</p>
-                  </div>
-
-                  {/* Service Options - Ticket Style */}
-                  {quote.service_items.map((item) => {
+                  {/* Aircraft Options */}
+                  {quote.service_items.map((item, index) => {
                     const override = serviceOverrides[item.id] || {}
                     const displayImages = override.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
                     const displayName = override.display_name || item.service_name
-                    const displayDescription = override.display_description || item.description || ''
-                    const details = override.details || []
-
-                    // Extract specific details - Plane mode
-                    const dateDetail = details.find(d => d.label === 'Date')?.value || ''
-                    const departureCode = details.find(d => d.label === 'Departure Code')?.value || ''
-                    const departureDetail = details.find(d => d.label === 'Departure')?.value || ''
-                    const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || ''
-                    const arrivalDetail = details.find(d => d.label === 'Arrival')?.value || ''
-                    const duration = details.find(d => d.label === 'Duration')?.value || ''
-                    const passengers = details.find(d => d.label === 'Passengers')?.value || ''
-
-                    // Extract details - Yacht mode
-                    const departureMarina = details.find(d => d.label === 'Departure Marina')?.value || ''
-                    const destination = details.find(d => d.label === 'Destination')?.value || ''
-                    const guests = details.find(d => d.label === 'Guests')?.value || ''
-
-                    // Extract details - Car mode
-                    const pickup = details.find(d => d.label === 'Pickup')?.value || ''
-                    const dropoff = details.find(d => d.label === 'Dropoff')?.value || ''
-
-                    // Extract details - Generic mode
-                    const location = details.find(d => d.label === 'Location')?.value || ''
-
-                    // Get guest/passenger count for badge
-                    const guestCount = passengers || guests || ''
+                    const jetModel = override.jet_model || ''
+                    const passengers = override.passengers || ''
+                    const flightTime = override.flight_time || ''
+                    const servicesList = override.services_list || []
 
                     return (
-                      <div key={item.id} className="bg-white border-b-8 border-gray-100">
-                        {/* Images Section */}
-                        {displayImages.length > 0 && (
-                          <div className="relative">
-                            {/* Main image */}
-                            <div className="relative h-48 overflow-hidden">
-                              <img
-                                src={displayImages[0]}
-                                alt="Main"
-                                className="w-full h-full object-cover"
-                              />
-                              {/* Overlay badge with name */}
-                              <div className="absolute top-3 left-3 bg-black/20 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-lg leading-none">
-                                <span className="leading-none display-name-arrow">→</span> <span className="leading-none display-name">{displayName}</span>
-                              </div>
-                            </div>
-
-                            {/* Secondary image */}
-                            {displayImages[1] && (
-                              <div className="relative h-48 overflow-hidden">
-                                <img
-                                  src={displayImages[1]}
-                                  alt="Interior"
-                                  className="w-full h-full object-cover"
-                                />
-                                {/* Guest/Passenger count badge */}
-                                {guestCount && (
-                                  <div className="absolute top-3 right-3 bg-white/30 backdrop-blur-sm text-gray-700 text-xs px-2.5 py-1.5 rounded-full inline-flex items-center gap-1 shadow leading-none">
-                                    <User className="h-3 w-3 flex-shrink-0" /> <span className="leading-none passenger-count">{guestCount}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                      <div key={item.id} className="bg-white">
+                        {/* Dotted Separator (except for first item) */}
+                        {index > 0 && (
+                          <div className="py-6 px-8">
+                            <div className="border-t border-dashed border-gray-300"></div>
                           </div>
                         )}
 
-                        {/* Trip Details */}
-                        <div className="p-5 bg-white">
-                          {/* Description - shown for all modes */}
-                          {displayDescription && headerIcon !== 'plane' && (
-                            <p className="text-xs text-gray-600 mb-4 whitespace-pre-wrap">{displayDescription}</p>
-                          )}
+                        {/* Option Header */}
+                        <div className="px-5 py-4">
+                          <p className="text-[10px] text-gray-800 tracking-widest text-center font-medium">
+                            · {String(index + 1).padStart(2, '0')} PRIVATE ROUTE·
+                          </p>
+                        </div>
 
-                          {/* Plane Mode - Boarding Pass Style */}
-                          {headerIcon === 'plane' && (
-                            <div className="mb-5 rounded-xl overflow-hidden shadow-sm" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                              {/* Boarding Pass Header */}
-                              <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: '#111827' }}>
-                                <div className="flex items-center gap-2">
-                                  <svg className="w-4 h-4" fill="#ffffff" viewBox="0 0 24 24">
-                                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                                  </svg>
-                                  <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>Boarding Pass</span>
-                                </div>
-                                {dateDetail && (
-                                  <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{dateDetail}</span>
-                                )}
-                              </div>
-
-                              {/* Main Flight Route Section */}
-                              <div className="p-4" style={{ backgroundColor: '#ffffff' }}>
-                                <div className="flex items-center justify-between">
-                                  {/* Departure */}
-                                  <div className="text-left flex-1">
-                                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>From</p>
-                                    <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{departureCode || '---'}</p>
-                                    <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{departureDetail || 'Departure'}</p>
-                                  </div>
-
-                                  {/* Flight Path */}
-                                  <div className="flex-1 px-2">
-                                    <div className="flex flex-col items-center">
-                                      <p className="text-[10px] mb-2 font-medium" style={{ color: '#9ca3af' }}>{duration || '---'}</p>
-                                      <div className="flex items-center w-full">
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#111827', border: '2px solid #e5e7eb' }}></div>
-                                        <div className="flex-1 mx-1 relative" style={{ borderTop: '2px dashed #d1d5db' }}>
-                                          <svg className="w-5 h-5 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ backgroundColor: '#ffffff' }} fill="#374151" viewBox="0 0 24 24">
-                                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                                          </svg>
-                                        </div>
-                                        <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#9ca3af', border: '2px solid #e5e7eb' }}></div>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Arrival */}
-                                  <div className="text-right flex-1">
-                                    <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>To</p>
-                                    <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{arrivalCode || '---'}</p>
-                                    <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{arrivalDetail || 'Arrival'}</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Ticket Tear Line */}
-                              <div className="relative h-4">
-                                <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-r-full" style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}></div>
-                                <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-l-full" style={{ backgroundColor: '#ffffff', borderLeft: '1px solid #e5e7eb' }}></div>
-                                <div className="absolute inset-x-5 top-1/2" style={{ borderTop: '2px dashed #d1d5db' }}></div>
-                              </div>
-
-                              {/* Additional Details Grid */}
-                              <div className="p-4" style={{ backgroundColor: '#f9fafb' }}>
-                                <div className="grid grid-cols-3 gap-3">
-                                  {passengers && (
-                                    <div className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
-                                      <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Passengers</p>
-                                      <p className="text-lg font-bold" style={{ color: '#111827' }}>{passengers}</p>
-                                    </div>
-                                  )}
-                                  {details
-                                    .filter(d =>
-                                      d.value &&
-                                      !['Date', 'Departure Code', 'Departure', 'Arrival Code', 'Arrival', 'Duration', 'Passengers'].includes(d.label)
-                                    )
-                                    .map((detail, idx) => (
-                                      <div key={idx} className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
-                                        <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>{detail.label}</p>
-                                        <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
-                                      </div>
-                                    ))
-                                  }
-                                </div>
-                                {/* Description inside boarding pass */}
-                                {displayDescription && (
-                                  <p className="text-xs mt-3 pt-3" style={{ color: '#6b7280', borderTop: '1px solid #e5e7eb' }}>{displayDescription}</p>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Date for non-plane modes */}
-                          {headerIcon !== 'plane' && dateDetail && (
-                            <p className="text-sm mb-3" style={{ color: '#6b7280' }}>{dateDetail}</p>
-                          )}
-
-                          {/* Yacht Mode - Route Style */}
-                          {headerIcon === 'yacht' && (departureMarina || destination) && (
-                            <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                              <div className="flex items-center gap-3">
-                                <div className="flex flex-col items-center">
-                                  <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#3b82f6', border: '2px solid #ffffff' }}></div>
-                                  <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
-                                  <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
-                                </div>
-                                <div className="flex-1 space-y-4">
-                                  {departureMarina && (
-                                    <div>
-                                      <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Departure Marina</p>
-                                      <p className="text-sm font-semibold" style={{ color: '#111827' }}>{departureMarina}</p>
-                                    </div>
-                                  )}
-                                  {destination && (
-                                    <div>
-                                      <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Destination</p>
-                                      <p className="text-sm font-semibold" style={{ color: '#111827' }}>{destination}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Car Mode - Route Style */}
-                          {headerIcon === 'car' && (pickup || dropoff) && (
-                            <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                              <div className="flex items-center gap-3">
-                                <div className="flex flex-col items-center">
-                                  <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#22c55e', border: '2px solid #ffffff' }}></div>
-                                  <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
-                                  <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
-                                </div>
-                                <div className="flex-1 space-y-4">
-                                  {pickup && (
-                                    <div>
-                                      <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Pickup</p>
-                                      <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{pickup}</p>
-                                    </div>
-                                  )}
-                                  {dropoff && (
-                                    <div>
-                                      <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Dropoff</p>
-                                      <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{dropoff}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Grid for remaining details - non-plane modes */}
-                          {headerIcon !== 'plane' && details.filter(d => {
-                            if (!d.value || d.label === 'Date') return false
-                            if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
-                            if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
-                            return true
-                          }).length > 0 && (
-                            <div className="mb-5 grid grid-cols-2 gap-2">
-                              {details
-                                .filter(d => {
-                                  if (!d.value || d.label === 'Date') return false
-                                  if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
-                                  if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
-                                  return true
-                                })
-                                .map((detail, idx) => (
-                                  <div key={idx} className="rounded-lg p-3" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                                    <p className="text-[9px] uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>{detail.label}</p>
-                                    <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
-                                  </div>
-                                ))
-                              }
-                            </div>
-                          )}
-
-                          {/* Price */}
-                          <div className="text-right pt-4 border-t border-gray-100">
-                            <p className="text-2xl font-bold text-gray-900">
-                              {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
-                            </p>
-                            <p className="text-xs text-gray-400">Total</p>
+                        {/* Aircraft Name & Specs - Dark Background */}
+                        <div className="aircraft-specs-bar bg-gray-800 px-5 py-3 flex justify-between items-center">
+                          <div>
+                            <h3 className="text-base font-bold text-white">{displayName}</h3>
+                            {jetModel && <p className="text-xs text-gray-400 uppercase">{jetModel}</p>}
                           </div>
+                          <div className="text-right text-[10px] text-gray-300">
+                            {passengers && <span>{passengers} Passengers</span>}
+                            {passengers && flightTime && <span className="mx-1">·</span>}
+                            {flightTime && <span>{flightTime} Flight Time</span>}
+                          </div>
+                        </div>
+
+                        {/* Main Aircraft Image */}
+                        {displayImages[0] && (
+                          <div className="relative h-48 overflow-hidden">
+                            <img
+                              src={displayImages[0]}
+                              alt="Aircraft Exterior"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* Details Section - Two Column Layout */}
+                        <div className="flex">
+                          {/* Left Column - Aircraft Info */}
+                          <div className="flex-1 p-5 border-r border-gray-100">
+                            <div className="mb-4">
+                              <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Aircraft</p>
+                              <p className="text-sm font-semibold text-gray-900">
+                                {displayName} {jetModel}
+                              </p>
+                            </div>
+
+                            {servicesList.length > 0 && (
+                              <div className="mb-4">
+                                <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-2">Services</p>
+                                <div className="space-y-1">
+                                  {servicesList.filter(s => s).map((service, sIdx) => (
+                                    <p key={sIdx} className="text-xs text-gray-600">· {service}</p>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="pt-4 border-t border-gray-100">
+                              <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Total</p>
+                              <p className="text-2xl font-bold text-gray-900">
+                                {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override.price_override ?? item.price)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Right Column - Interior Image */}
+                          {displayImages[1] && (
+                            <div className="w-40 overflow-hidden">
+                              <img
+                                src={displayImages[1]}
+                                alt="Aircraft Interior"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
                   })}
 
-                  {/* Notes & Terms Section */}
-                  {(customNotes || customTerms) && (
-                    <div className="p-5" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e5e7eb' }}>
-                      {customNotes && (
-                        <div className="mb-4">
-                          <p className="text-[10px] uppercase tracking-wider mb-2 font-medium" style={{ color: '#9ca3af' }}>Notes</p>
-                          <p className="text-xs whitespace-pre-wrap" style={{ color: '#374151' }}>{customNotes}</p>
-                        </div>
-                      )}
-                      {customTerms && (
-                        <div>
-                          <p className="text-[10px] uppercase tracking-wider mb-2 font-medium" style={{ color: '#9ca3af' }}>Terms & Conditions</p>
-                          <p className="text-xs whitespace-pre-wrap" style={{ color: '#6b7280' }}>{customTerms}</p>
-                        </div>
-                      )}
+                  {/* Services Note */}
+                  <div className="bg-white px-8 py-6">
+                    <div className="border-t border-dashed border-gray-300 mb-4"></div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wider text-center font-medium">
+                      All services are customized to your private aviation experience
+                    </p>
+                    <div className="border-t border-dashed border-gray-300 mt-4"></div>
+                  </div>
+
+                  {/* Notes Section */}
+                  {customNotes && (
+                    <div className="bg-white px-5 py-4 border-b border-gray-100">
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-2">Notes:</p>
+                      <p className="text-xs text-gray-600 whitespace-pre-wrap">{customNotes}</p>
                     </div>
                   )}
 
                   {/* Footer */}
-                  <div className="p-5 text-center" style={{ backgroundColor: '#111827' }}>
-                    <p className="text-sm font-bold tracking-widest mb-1" style={{ color: '#ffffff' }}>CADIZ & LLUIS</p>
-                    <p className="text-[10px] tracking-wider uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>Luxury Living</p>
-                    <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                  <div className="bg-gray-900 px-5 py-6 text-center">
+                    <p className="text-lg font-bold text-white tracking-[0.2em] mb-1">CADIZ & LLUIS</p>
+                    <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Luxury Living</p>
+                    <p className="text-[10px] text-white uppercase tracking-wider mb-2">
                       Quote valid until {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
-                    <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>
-                      brody@cadizlluis.com • www.cadizlluis.com
+                    <p className="text-[10px] text-gray-500">
+                      {quote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
                     </p>
                   </div>
                 </div>
@@ -1431,23 +1504,24 @@ export function QuotePDFBuilderDialog({
         </Tabs>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between gap-4 px-6 py-4 border-t border-white/10">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-4 px-4 sm:px-6 py-3 sm:py-4 border-t border-white/10">
           <Button
             type="button"
             variant="ghost"
             onClick={handleReset}
-            className="text-white/70 hover:text-white hover:bg-white/10"
+            className="text-white/70 hover:text-white hover:bg-white/10 order-last sm:order-first text-xs sm:text-sm"
           >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Reset to Defaults
+            <RotateCcw className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Reset to Defaults</span>
+            <span className="sm:hidden ml-2">Reset</span>
           </Button>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="border-white/30 hover:bg-white/10 text-white"
+              className="border-white/30 hover:bg-white/10 text-white flex-1 sm:flex-none text-xs sm:text-sm"
             >
               Cancel
             </Button>
@@ -1456,37 +1530,27 @@ export function QuotePDFBuilderDialog({
               variant="outline"
               onClick={handleDownloadPDF}
               disabled={isDownloading}
-              className="border-white/30 hover:bg-white/10 text-white"
+              className="border-white/30 hover:bg-white/10 text-white flex-1 sm:flex-none text-xs sm:text-sm"
             >
               {isDownloading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
               ) : (
-                <>
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PDF
-                </>
+                <Download className="h-4 w-4 sm:mr-2" />
               )}
+              <span className="hidden sm:inline">{isDownloading ? 'Generating...' : 'Download PDF'}</span>
             </Button>
             <Button
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="btn-luxury"
+              className="btn-luxury flex-1 sm:flex-none text-xs sm:text-sm"
             >
               {isSaving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
+                <Loader2 className="h-4 w-4 animate-spin sm:mr-2" />
               ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Customization
-                </>
+                <Save className="h-4 w-4 sm:mr-2" />
               )}
+              <span className="hidden sm:inline">{isSaving ? 'Saving...' : 'Save'}</span>
             </Button>
           </div>
         </div>

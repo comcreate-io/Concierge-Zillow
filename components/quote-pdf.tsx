@@ -40,6 +40,32 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: colors.text,
   },
+  // Header Image Container
+  headerImageContainer: {
+    position: 'relative',
+    height: 120,
+    marginBottom: 30,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  headerImage: {
+    width: '100%',
+    height: 120,
+    objectFit: 'cover',
+  },
+  // Header overlay
+  headerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(26, 26, 46, 0.8)',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
   // Header
   header: {
     flexDirection: 'row',
@@ -434,19 +460,11 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
   return (
     <Document>
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoSection}>
-            <Text style={styles.logoText}>{company.name}</Text>
-            <Text style={styles.logoSubtext}>{company.tagline}</Text>
-          </View>
-          <View style={styles.companyInfo}>
-            <Text>{company.phone}</Text>
-            <Text>{company.email}</Text>
-            <Text>{company.address}</Text>
-            <Text>{company.website}</Text>
-          </View>
-        </View>
+        {/* Header Image */}
+        <Image
+          src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767127062/invoiceImage_lcy4qm.png"
+          style={styles.headerImage}
+        />
 
         {/* Quote Badge */}
         <View style={styles.quoteBadge}>

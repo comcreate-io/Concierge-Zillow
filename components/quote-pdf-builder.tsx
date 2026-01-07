@@ -36,6 +36,9 @@ const colors = {
 // Logo URL - using the black logo for white PDF background
 const LOGO_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1765826144/concierge/CL_Black_LOGO.png'
 
+// Header image URL
+const HEADER_IMAGE_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767127062/invoiceImage_lcy4qm.png'
+
 const styles = StyleSheet.create({
   page: {
     backgroundColor: colors.background,
@@ -43,6 +46,31 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter',
     fontSize: 10,
     color: colors.text,
+  },
+  // Header image container
+  headerImageContainer: {
+    position: 'relative',
+    height: 100,
+  },
+  headerImage: {
+    width: '100%',
+    height: 100,
+    objectFit: 'cover',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
+  // Header overlay on image
+  headerOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(17, 24, 39, 0.8)',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   // Main ticket container
   ticketContainer: {
@@ -73,7 +101,7 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 12,
     fontWeight: 700,
-    color: colors.text,
+    color: colors.white,
     letterSpacing: 2,
     marginLeft: 10,
   },
@@ -82,13 +110,13 @@ const styles = StyleSheet.create({
   },
   quoteNumber: {
     fontSize: 9,
-    color: colors.textMuted,
+    color: 'rgba(255, 255, 255, 0.8)',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   quoteDate: {
     fontSize: 8,
-    color: colors.textMuted,
+    color: 'rgba(255, 255, 255, 0.6)',
     marginTop: 2,
   },
   // Header
@@ -449,17 +477,8 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
       <Page size="A4" style={styles.page}>
         {/* Main Ticket Container */}
         <View style={styles.ticketContainer}>
-          {/* Top Header with Logo */}
-          <View style={styles.topHeader}>
-            <View style={styles.logoContainer}>
-              <Image src={LOGO_URL} style={styles.logo} />
-              <Text style={styles.brandName}>CADIZ & LLUIS</Text>
-            </View>
-            <View style={styles.quoteInfo}>
-              <Text style={styles.quoteNumber}>{quote.quote_number}</Text>
-              <Text style={styles.quoteDate}>{formatDate(quote.created_at)}</Text>
-            </View>
-          </View>
+          {/* Header Image */}
+          <Image src={HEADER_IMAGE_URL} style={styles.headerImage} />
 
           {/* Title Header */}
           <View style={styles.header}>

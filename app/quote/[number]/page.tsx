@@ -946,311 +946,212 @@ export default function QuoteViewPage() {
       )}
 
       {/* Hidden PDF Preview for Download */}
-      <div ref={pdfPreviewRef} className="fixed left-[-9999px] top-0" style={{ width: '400px' }}>
+      <div ref={pdfPreviewRef} className="fixed left-[-9999px] top-0" style={{ width: '420px' }}>
         <div className="pdf-ticket bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-          {/* Top Header with Logo - Navy Blue */}
-          <div className="bg-gray-900 px-5 py-4 flex items-center justify-between">
+          {/* Header Image with Logo */}
+          <div className="header-image-container relative" style={{ width: '100%', height: '220px', overflow: 'hidden' }}>
             <img
-              src="/logo/CL White LOGO.png"
-              alt="Cadiz & Lluis"
-              className="h-10 w-auto object-contain"
+              src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767797886/quoteCover_qmol4g.jpg"
+              alt="Header"
+              crossOrigin="anonymous"
+              style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
             />
-            <div className="text-right">
-              <p className="text-[10px] text-white/60 uppercase tracking-wider">{quote.quote_number}</p>
-              <p className="text-[9px] text-white/50">
-                {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
+            {/* Logo Overlay */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <img
+                  src="/logo/CL Balck LOGO .png"
+                  alt="Cadiz & Lluis"
+                  className="h-16 w-auto object-contain"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Title Header - White Background */}
-          <div className="bg-white p-4 text-center border-b border-gray-100">
-            <h1 className="text-xl font-bold text-gray-900 flex items-center justify-center gap-2">
-              {quote.pdf_customization?.header_title || 'Private Quotes'}
+          {/* Title Section */}
+          <div className="bg-white py-6 text-center">
+            {/* Line separator */}
+            <div className="w-32 h-0.5 bg-gray-800 mx-auto mb-4"></div>
+            <h1 className="text-xl font-semibold text-gray-900 tracking-[0.2em] uppercase">
+              {quote.pdf_customization?.header_icon === 'plane' ? 'PRIVATE JET PROPOSAL' :
+               quote.pdf_customization?.header_icon === 'yacht' ? 'YACHT CHARTER PROPOSAL' :
+               quote.pdf_customization?.header_icon === 'car' ? 'LUXURY CAR SERVICE' :
+               quote.pdf_customization?.header_title || 'SERVICE PROPOSAL'}
             </h1>
-            {quote.pdf_customization?.header_subtitle && (
-              <p className="text-xs text-gray-500 mt-1">{quote.pdf_customization.header_subtitle}</p>
+          </div>
+
+          {/* Boarding Pass Header */}
+          {quote.pdf_customization?.header_icon === 'plane' && (
+            <div className="bg-gray-800 px-5 py-3">
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-widest">
+                <span className="text-white font-medium">Boarding Pass · Private Charter</span>
+                <span className="text-white">Exclusive Rates</span>
+              </div>
+            </div>
+          )}
+
+          {/* Client Info & Route Section */}
+          <div className="bg-white px-5 py-4 border-b border-gray-100">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Prepared for:</p>
+                <p className="text-sm font-semibold text-gray-900">{quote.client_name}</p>
+                <p className="text-xs text-gray-500">{quote.client_email}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Date:</p>
+                <p className="text-sm font-semibold text-gray-900">
+                  {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+                <p className="text-xs text-gray-500">{quote.quote_number}</p>
+              </div>
+            </div>
+
+            {/* Route Display */}
+            {quote.pdf_customization?.header_icon === 'plane' && quote.pdf_customization?.route && (
+              <div className="flex items-center justify-center gap-4 py-4">
+                <div className="text-center">
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">From</p>
+                  <p className="text-2xl font-bold text-gray-900">{quote.pdf_customization.route.departure_code || '---'}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{quote.pdf_customization.route.departure_city || 'Departure'}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-8 border-t-2 border-dashed border-gray-300"></div>
+                  <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+                  </svg>
+                  <div className="w-8 border-t-2 border-dashed border-gray-300"></div>
+                </div>
+                <div className="text-center">
+                  <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">To</p>
+                  <p className="text-2xl font-bold text-gray-900">{quote.pdf_customization.route.arrival_code || '---'}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">{quote.pdf_customization.route.arrival_city || 'Arrival'}</p>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Client Info */}
-          <div className="bg-white px-5 pt-3 pb-6 border-b border-gray-100">
-            <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Prepared For</p>
-            <p className="text-sm font-semibold text-gray-900">{quote.client_name}</p>
-            <p className="text-xs text-gray-500">{quote.client_email}</p>
-          </div>
-
-          {/* Service Options */}
-          {quote.service_items.map((item) => {
+          {/* Aircraft Options */}
+          {quote.service_items.map((item, index) => {
             const override = quote.pdf_customization?.service_overrides?.[item.id]
             const displayImages = override?.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
             const displayName = override?.display_name || item.service_name
-            const displayDescription = override?.display_description || item.description || ''
-            const details = override?.details || []
-            const headerIcon = quote.pdf_customization?.header_icon || 'plane'
-
-            // Extract details - Plane mode
-            const dateDetail = details.find(d => d.label === 'Date')?.value || ''
-            const departureCode = details.find(d => d.label === 'Departure Code')?.value || ''
-            const departureDetail = details.find(d => d.label === 'Departure')?.value || ''
-            const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || ''
-            const arrivalDetail = details.find(d => d.label === 'Arrival')?.value || ''
-            const duration = details.find(d => d.label === 'Duration')?.value || ''
-            const passengers = details.find(d => d.label === 'Passengers')?.value || ''
-
-            // Extract details - Yacht mode
-            const departureMarina = details.find(d => d.label === 'Departure Marina')?.value || ''
-            const destination = details.find(d => d.label === 'Destination')?.value || ''
-            const guests = details.find(d => d.label === 'Guests')?.value || ''
-
-            // Extract details - Car mode
-            const pickup = details.find(d => d.label === 'Pickup')?.value || ''
-            const dropoff = details.find(d => d.label === 'Dropoff')?.value || ''
-
-            // Extract details - Generic mode
-            const location = details.find(d => d.label === 'Location')?.value || ''
-
-            // Get guest/passenger count for badge
-            const guestCount = passengers || guests || ''
+            const jetModel = override?.jet_model || ''
+            const passengers = override?.passengers || ''
+            const flightTime = override?.flight_time || ''
+            const servicesList = override?.services_list || []
 
             return (
-              <div key={item.id} className="bg-white border-b-8 border-gray-100">
-                {displayImages.length > 0 && (
-                  <div className="relative">
-                    <div className="relative h-48 overflow-hidden">
-                      <img
-                        src={displayImages[0]}
-                        alt="Main"
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute top-3 left-3 bg-black/20 backdrop-blur-sm text-white text-xs px-3 py-1.5 rounded-full inline-flex items-center gap-1.5 shadow-lg leading-none">
-                        <span className="leading-none display-name-arrow">→</span> <span className="leading-none display-name">{displayName}</span>
-                      </div>
-                    </div>
-
-                    {displayImages[1] && (
-                      <div className="relative h-48 overflow-hidden">
-                        <img
-                          src={displayImages[1]}
-                          alt="Interior"
-                          className="w-full h-full object-cover"
-                        />
-                        {guestCount && (
-                          <div className="absolute top-3 right-3 bg-white/30 backdrop-blur-sm text-gray-700 text-xs px-2.5 py-1.5 rounded-full inline-flex items-center gap-1 shadow leading-none">
-                            <User className="h-3 w-3 flex-shrink-0" /> <span className="leading-none passenger-count">{guestCount}</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
+              <div key={item.id} className="bg-white">
+                {/* Dotted Separator (except for first item) */}
+                {index > 0 && (
+                  <div className="py-6 px-8">
+                    <div className="border-t border-dashed border-gray-300"></div>
                   </div>
                 )}
 
-                <div className="p-5 bg-white">
-                  {/* Description - shown for non-plane modes only (plane mode shows it inside boarding pass) */}
-                  {displayDescription && headerIcon !== 'plane' && (
-                    <p className="text-xs text-gray-600 mb-4 whitespace-pre-wrap">{displayDescription}</p>
-                  )}
+                {/* Option Header */}
+                <div className="px-5 py-4">
+                  <p className="text-[10px] text-gray-800 tracking-widest text-center font-medium">
+                    · {String(index + 1).padStart(2, '0')} PRIVATE ROUTE·
+                  </p>
+                </div>
 
-                  {/* Plane Mode - Boarding Pass Style */}
-                  {headerIcon === 'plane' && (
-                    <div className="mb-5 rounded-xl overflow-hidden shadow-sm" style={{ backgroundColor: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                      {/* Boarding Pass Header */}
-                      <div className="px-4 py-2 flex items-center justify-between" style={{ backgroundColor: '#111827' }}>
-                        <div className="flex items-center gap-2">
-                          <svg className="w-4 h-4" fill="#ffffff" viewBox="0 0 24 24">
-                            <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                          </svg>
-                          <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'rgba(255,255,255,0.8)' }}>Boarding Pass</span>
-                        </div>
-                        {dateDetail && (
-                          <span className="text-[10px]" style={{ color: 'rgba(255,255,255,0.6)' }}>{dateDetail}</span>
-                        )}
-                      </div>
-
-                      {/* Main Flight Route Section */}
-                      <div className="p-4" style={{ backgroundColor: '#ffffff' }}>
-                        <div className="flex items-center justify-between">
-                          {/* Departure */}
-                          <div className="text-left flex-1">
-                            <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>From</p>
-                            <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{departureCode || '---'}</p>
-                            <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{departureDetail || 'Departure'}</p>
-                          </div>
-
-                          {/* Flight Path */}
-                          <div className="flex-1 px-2">
-                            <div className="flex flex-col items-center">
-                              <p className="text-[10px] mb-2 font-medium" style={{ color: '#9ca3af' }}>{duration || '---'}</p>
-                              <div className="flex items-center w-full">
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#111827', border: '2px solid #e5e7eb' }}></div>
-                                <div className="flex-1 mx-1 relative" style={{ borderTop: '2px dashed #d1d5db' }}>
-                                  <svg className="w-5 h-5 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" style={{ backgroundColor: '#ffffff' }} fill="#374151" viewBox="0 0 24 24">
-                                    <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
-                                  </svg>
-                                </div>
-                                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: '#9ca3af', border: '2px solid #e5e7eb' }}></div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* Arrival */}
-                          <div className="text-right flex-1">
-                            <p className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#9ca3af' }}>To</p>
-                            <p className="text-3xl font-bold tracking-tight" style={{ color: '#111827' }}>{arrivalCode || '---'}</p>
-                            <p className="text-xs mt-1" style={{ color: '#6b7280', paddingBottom: '12px' }}>{arrivalDetail || 'Arrival'}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Ticket Tear Line */}
-                      <div className="relative h-4">
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-r-full" style={{ backgroundColor: '#ffffff', borderRight: '1px solid #e5e7eb' }}></div>
-                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-8 rounded-l-full" style={{ backgroundColor: '#ffffff', borderLeft: '1px solid #e5e7eb' }}></div>
-                        <div className="absolute inset-x-5 top-1/2" style={{ borderTop: '2px dashed #d1d5db' }}></div>
-                      </div>
-
-                      {/* Additional Details Grid */}
-                      <div className="p-4" style={{ backgroundColor: '#f9fafb' }}>
-                        <div className="grid grid-cols-3 gap-3">
-                          {passengers && (
-                            <div className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
-                              <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Passengers</p>
-                              <p className="text-lg font-bold" style={{ color: '#111827' }}>{passengers}</p>
-                            </div>
-                          )}
-                          {details
-                            .filter(d =>
-                              d.value &&
-                              !['Date', 'Departure Code', 'Departure', 'Arrival Code', 'Arrival', 'Duration', 'Passengers'].includes(d.label)
-                            )
-                            .map((detail, idx) => (
-                              <div key={idx} className="rounded-lg p-2" style={{ backgroundColor: '#ffffff', border: '1px solid #f3f4f6' }}>
-                                <p className="text-[8px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>{detail.label}</p>
-                                <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
-                              </div>
-                            ))
-                          }
-                        </div>
-                        {/* Description inside boarding pass */}
-                        {displayDescription && (
-                          <p className="text-xs mt-3 pt-3" style={{ color: '#6b7280', borderTop: '1px solid #e5e7eb' }}>{displayDescription}</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Date for non-plane modes */}
-                  {headerIcon !== 'plane' && dateDetail && (
-                    <p className="text-sm mb-3" style={{ color: '#6b7280' }}>{dateDetail}</p>
-                  )}
-
-                  {/* Yacht Mode - Route Style */}
-                  {headerIcon === 'yacht' && (departureMarina || destination) && (
-                    <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#3b82f6', border: '2px solid #ffffff' }}></div>
-                          <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
-                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
-                        </div>
-                        <div className="flex-1 space-y-4">
-                          {departureMarina && (
-                            <div>
-                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Departure Marina</p>
-                              <p className="text-sm font-semibold" style={{ color: '#111827' }}>{departureMarina}</p>
-                            </div>
-                          )}
-                          {destination && (
-                            <div>
-                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Destination</p>
-                              <p className="text-sm font-semibold" style={{ color: '#111827' }}>{destination}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Car Mode - Route Style */}
-                  {headerIcon === 'car' && (pickup || dropoff) && (
-                    <div className="mb-4 rounded-lg p-4" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col items-center">
-                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#22c55e', border: '2px solid #ffffff' }}></div>
-                          <div className="w-0.5 h-8" style={{ backgroundColor: '#e5e7eb' }}></div>
-                          <div className="w-3 h-3 rounded-full shadow" style={{ backgroundColor: '#111827', border: '2px solid #ffffff' }}></div>
-                        </div>
-                        <div className="flex-1 space-y-4">
-                          {pickup && (
-                            <div>
-                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Pickup</p>
-                              <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{pickup}</p>
-                            </div>
-                          )}
-                          {dropoff && (
-                            <div>
-                              <p className="text-[9px] uppercase tracking-wider" style={{ color: '#9ca3af' }}>Dropoff</p>
-                              <p className="text-sm font-semibold uppercase" style={{ color: '#111827' }}>{dropoff}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Grid for remaining details - non-plane modes */}
-                  {headerIcon !== 'plane' && details.filter(d => {
-                    if (!d.value || d.label === 'Date') return false
-                    if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
-                    if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
-                    return true
-                  }).length > 0 && (
-                    <div className="mb-5 grid grid-cols-2 gap-2">
-                      {details
-                        .filter(d => {
-                          if (!d.value || d.label === 'Date') return false
-                          if (headerIcon === 'yacht' && ['Departure Marina', 'Destination'].includes(d.label)) return false
-                          if (headerIcon === 'car' && ['Pickup', 'Dropoff'].includes(d.label)) return false
-                          return true
-                        })
-                        .map((detail, idx) => (
-                          <div key={idx} className="rounded-lg p-3" style={{ backgroundColor: '#f9fafb', border: '1px solid #f3f4f6' }}>
-                            <p className="text-[9px] uppercase tracking-wider mb-0.5" style={{ color: '#9ca3af' }}>{detail.label}</p>
-                            <p className="text-sm font-semibold" style={{ color: '#111827' }}>{detail.value}</p>
-                          </div>
-                        ))
-                      }
-                    </div>
-                  )}
-
-                  <div className="text-right pt-4 border-t border-gray-100">
-                    <p className="text-2xl font-bold text-gray-900">
-                      {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
-                    </p>
-                    <p className="text-xs text-gray-400">Total</p>
+                {/* Aircraft Name & Specs - Dark Background */}
+                <div className="bg-gray-800 px-5 py-3 flex justify-between items-center">
+                  <div>
+                    <h3 className="text-base font-bold text-white">{displayName}</h3>
+                    {jetModel && <p className="text-xs text-gray-400 uppercase">{jetModel}</p>}
                   </div>
+                  <div className="text-right text-[10px] text-gray-300">
+                    {passengers && <span>{passengers} Passengers</span>}
+                    {passengers && flightTime && <span className="mx-1">·</span>}
+                    {flightTime && <span>{flightTime} Flight Time</span>}
+                  </div>
+                </div>
+
+                {/* Main Aircraft Image */}
+                {displayImages[0] && (
+                  <div className="relative h-48 overflow-hidden">
+                    <img
+                      src={displayImages[0]}
+                      alt="Aircraft Exterior"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                {/* Details Section - Two Column Layout */}
+                <div className="flex">
+                  {/* Left Column - Aircraft Info */}
+                  <div className="flex-1 p-5 border-r border-gray-100">
+                    <div className="mb-4">
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Aircraft</p>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {displayName} {jetModel}
+                      </p>
+                    </div>
+
+                    {servicesList.length > 0 && (
+                      <div className="mb-4">
+                        <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-2">Services</p>
+                        <div className="space-y-1">
+                          {servicesList.filter(s => s).map((service, sIdx) => (
+                            <p key={sIdx} className="text-xs text-gray-600">· {service}</p>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="pt-4 border-t border-gray-100">
+                      <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Total</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override?.price_override ?? item.price)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Right Column - Interior Image */}
+                  {displayImages[1] && (
+                    <div className="w-40 overflow-hidden">
+                      <img
+                        src={displayImages[1]}
+                        alt="Aircraft Interior"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             )
           })}
 
+          {/* Services Note */}
+          <div className="bg-white px-8 py-6">
+            <div className="border-t border-dashed border-gray-300 mb-4"></div>
+            <p className="text-[11px] text-gray-500 uppercase tracking-wider text-center font-medium">
+              All services are customized to your private aviation experience
+            </p>
+            <div className="border-t border-dashed border-gray-300 mt-4"></div>
+          </div>
+
           {/* Notes Section */}
-          {quote.notes && (
-            <div className="p-5" style={{ backgroundColor: '#ffffff', borderTop: '1px solid #e5e7eb' }}>
-              <p className="text-[10px] uppercase tracking-wider mb-2 font-medium" style={{ color: '#9ca3af' }}>Notes</p>
-              <p className="text-xs whitespace-pre-wrap" style={{ color: '#374151' }}>{quote.notes}</p>
+          {(quote.pdf_customization?.custom_notes || quote.notes) && (
+            <div className="bg-white px-5 py-4 border-b border-gray-100">
+              <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-2">Notes:</p>
+              <p className="text-xs text-gray-600 whitespace-pre-wrap">{quote.pdf_customization?.custom_notes || quote.notes}</p>
             </div>
           )}
 
           {/* Footer */}
-          <div className="p-5 text-center" style={{ backgroundColor: '#111827' }}>
-            <p className="text-sm font-bold tracking-widest mb-1" style={{ color: '#ffffff' }}>CADIZ & LLUIS</p>
-            <p className="text-[10px] tracking-wider uppercase mb-3" style={{ color: 'rgba(255,255,255,0.6)' }}>Luxury Living</p>
-            <p className="text-[10px]" style={{ color: 'rgba(255,255,255,0.5)' }}>
+          <div className="bg-gray-900 px-5 py-6 text-center">
+            <p className="text-lg font-bold text-white tracking-[0.2em] mb-1">CADIZ & LLUIS</p>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Luxury Living</p>
+            <p className="text-[10px] text-white uppercase tracking-wider mb-2">
               Quote valid until {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
             </p>
-            <p className="text-[10px] mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>
-              brody@cadizlluis.com • www.cadizlluis.com
+            <p className="text-[10px] text-gray-500">
+              {quote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
             </p>
           </div>
         </div>

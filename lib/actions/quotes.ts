@@ -34,6 +34,9 @@ export type Quote = {
   responded_at: string | null
   converted_to_invoice_id: string | null
   pdf_customization: PDFCustomization | null
+  // Manager info (populated from join)
+  manager_email?: string
+  manager_name?: string
 }
 
 export type QuoteWithItems = Quote & {
@@ -42,16 +45,29 @@ export type QuoteWithItems = Quote & {
 
 // PDF Customization types for visual quote builder
 export type ServiceOverride = {
-  display_name?: string
+  display_name?: string        // e.g., "2022 LearJet"
   display_description?: string
-  display_images?: string[]  // Selected images (max 2) from available images
+  display_images?: string[]    // Selected images (max 2) - exterior and interior
   details?: { label: string; value: string }[]  // e.g., Date, Departure, Arrival
+  // Jet-specific fields
+  jet_model?: string           // e.g., "45xr"
+  passengers?: string          // e.g., "8"
+  flight_time?: string         // e.g., "3h 27m"
+  services_list?: string[]     // e.g., ["Crew & in-flight refreshments", "VIP handling"]
+  price_override?: number      // Override price for display
 }
 
 export type PDFCustomization = {
   header_title?: string
   header_subtitle?: string
   header_icon?: 'plane' | 'car' | 'yacht' | 'none'
+  // Route info for jet quotes
+  route?: {
+    departure_code?: string    // e.g., "SCF"
+    departure_city?: string    // e.g., "Scottsdale"
+    arrival_code?: string      // e.g., "LAS"
+    arrival_city?: string      // e.g., "Las Vegas"
+  }
   service_overrides?: {
     [serviceItemId: string]: ServiceOverride
   }
@@ -226,7 +242,15 @@ export async function getQuoteById(quoteId: string) {
 
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
-    .select('*')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
     .eq('id', quoteId)
     .single()
 
@@ -244,10 +268,16 @@ export async function getQuoteById(quoteId: string) {
     return { error: itemsError.message, data: null }
   }
 
+  // Extract manager info from the joined data
+  const managerInfo = (quote as any).property_managers
+  const { property_managers, ...quoteData } = quote as any
+
   return {
     data: {
-      ...quote,
-      service_items: serviceItems || []
+      ...quoteData,
+      service_items: serviceItems || [],
+      manager_email: managerInfo?.email,
+      manager_name: managerInfo?.name ? `${managerInfo.name} ${managerInfo.last_name || ''}`.trim() : undefined,
     } as QuoteWithItems
   }
 }
@@ -258,7 +288,15 @@ export async function getQuoteByNumber(quoteNumber: string) {
 
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
-    .select('*')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
     .eq('quote_number', quoteNumber)
     .single()
 
@@ -287,10 +325,16 @@ export async function getQuoteByNumber(quoteNumber: string) {
       .eq('id', quote.id)
   }
 
+  // Extract manager info from the joined data
+  const managerInfo = (quote as any).property_managers
+  const { property_managers, ...quoteData } = quote as any
+
   return {
     data: {
-      ...quote,
-      service_items: serviceItems || []
+      ...quoteData,
+      service_items: serviceItems || [],
+      manager_email: managerInfo?.email,
+      manager_name: managerInfo?.name ? `${managerInfo.name} ${managerInfo.last_name || ''}`.trim() : undefined,
     } as QuoteWithItems
   }
 }
