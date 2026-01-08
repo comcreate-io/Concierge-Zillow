@@ -55,6 +55,9 @@ export type ServiceOverride = {
   flight_time?: string         // e.g., "3h 27m"
   services_list?: string[]     // e.g., ["Crew & in-flight refreshments", "VIP handling"]
   price_override?: number      // Override price for display
+  // Route fields for individual products (cars/yachts)
+  departure_city?: string      // e.g., "AIRPORT" or "MIAMI"
+  arrival_city?: string        // e.g., "HOTEL" or "BAHAMAS"
 }
 
 export type PDFCustomization = {

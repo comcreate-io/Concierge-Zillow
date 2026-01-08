@@ -31,6 +31,8 @@ const colors = {
   borderLight: '#f3f4f6',
   accent: '#3b82f6', // Blue accent for locations
   badgeBg: 'rgba(0, 0, 0, 0.6)', // Semi-transparent dark for badge
+  navyDark: '#1a2332', // Dark navy for yacht design
+  navyMedium: '#2a3a4a', // Medium navy
 }
 
 // Logo URL - using the black logo for white PDF background
@@ -38,6 +40,12 @@ const LOGO_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1765826144/
 
 // Header image URL
 const HEADER_IMAGE_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767127062/invoiceImage_lcy4qm.png'
+
+// Yacht hero image URL (lifestyle items - passport, watch, compass, etc.)
+const YACHT_HERO_IMAGE_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767891666/yacht_header01_vwasld.png'
+
+// Car hero image URL (car keys, sunglasses, passport)
+const CAR_HERO_IMAGE_URL = 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767891667/carss_1_q4pubs.png'
 
 const styles = StyleSheet.create({
   page: {
@@ -405,6 +413,699 @@ const styles = StyleSheet.create({
     fontWeight: 500,
     flex: 1,
   },
+  // ==================== YACHT-SPECIFIC STYLES ====================
+  yachtPage: {
+    backgroundColor: colors.white,
+    fontFamily: 'Inter',
+    fontSize: 10,
+    color: colors.text,
+  },
+  yachtContainer: {
+    backgroundColor: colors.white,
+  },
+  // Yacht hero section
+  yachtHero: {
+    position: 'relative',
+    height: 200,
+  },
+  yachtHeroImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  yachtLogoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  yachtLogo: {
+    width: 100,
+    height: 100,
+    marginBottom: 6,
+  },
+  yachtCompanyName: {
+    fontSize: 15,
+    fontWeight: 700,
+    color: colors.text,
+    letterSpacing: 2.5,
+  },
+  yachtBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.navyDark,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  yachtBannerText: {
+    fontSize: 12,
+    fontWeight: 700,
+    color: colors.white,
+    letterSpacing: 1.5,
+  },
+  // Yacht client info section
+  yachtClientSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 40,
+    paddingTop: 24,
+    paddingBottom: 20,
+  },
+  yachtClientBox: {
+    alignItems: 'flex-start',
+  },
+  yachtClientLabelBox: {
+    backgroundColor: colors.text,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    marginBottom: 8,
+  },
+  yachtClientLabel: {
+    fontSize: 8,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  yachtClientName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.text,
+    marginBottom: 3,
+  },
+  yachtClientEmail: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  yachtDateBox: {
+    alignItems: 'flex-end',
+  },
+  yachtDateLabelBox: {
+    backgroundColor: colors.text,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 8,
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    marginBottom: 8,
+  },
+  yachtDateLabel: {
+    fontSize: 8,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  yachtDate: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.text,
+    marginBottom: 3,
+  },
+  yachtQuoteNum: {
+    fontSize: 10,
+    color: colors.textSecondary,
+  },
+  // Dotted separator
+  yachtDottedLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#d1d5db',
+    borderStyle: 'dashed',
+    marginHorizontal: 40,
+    marginVertical: 8,
+  },
+  // Yacht route section
+  yachtRouteSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 28,
+    paddingHorizontal: 40,
+    gap: 24,
+  },
+  yachtRouteLabel: {
+    fontSize: 8,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  yachtRouteText: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.text,
+  },
+  yachtRouteArrow: {
+    fontSize: 18,
+    color: colors.textMuted,
+    marginHorizontal: 0,
+  },
+  yachtRouteColumn: {
+    alignItems: 'center',
+  },
+  // Yacht name header
+  yachtNameSection: {
+    backgroundColor: colors.navyDark,
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  yachtNameText: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: colors.white,
+    textAlign: 'center',
+    lineHeight: 1.2,
+    letterSpacing: 1.5,
+  },
+  // Yacht main image
+  yachtMainImage: {
+    width: '100%',
+    height: 220,
+    objectFit: 'cover',
+  },
+  // Description banner
+  yachtDescBanner: {
+    position: 'relative',
+    backgroundColor: colors.navyDark,
+    paddingVertical: 14,
+    paddingHorizontal: 50,
+    alignItems: 'center',
+  },
+  yachtDescText: {
+    fontSize: 11,
+    color: colors.white,
+    textAlign: 'center',
+    zIndex: 1,
+  },
+  yachtDescChevronLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 30,
+    height: '100%',
+    backgroundColor: colors.white,
+  },
+  yachtDescChevronRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 30,
+    height: '100%',
+    backgroundColor: colors.white,
+  },
+  // Details section with two columns
+  yachtDetailsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: 40,
+    paddingVertical: 32,
+    gap: 20,
+  },
+  yachtDetailsLeft: {
+    flex: 1,
+  },
+  yachtDetailsRight: {
+    width: 220,
+  },
+  yachtDetailItem: {
+    marginBottom: 20,
+  },
+  yachtDetailLabel: {
+    fontSize: 8,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 5,
+  },
+  yachtDetailValue: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: colors.text,
+  },
+  yachtServicesList: {
+    marginTop: 6,
+  },
+  yachtServicesItem: {
+    fontSize: 10,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  yachtSecondaryImage: {
+    width: '100%',
+    height: 150,
+    objectFit: 'cover',
+    borderRadius: 0,
+  },
+  yachtImageContainer: {
+    position: 'relative',
+  },
+  yachtPassengerBadge: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  yachtPassengerBadgeIcon: {
+    fontSize: 10,
+    color: colors.text,
+  },
+  yachtPassengerBadgeText: {
+    fontSize: 11,
+    fontWeight: 600,
+    color: colors.text,
+  },
+  // Additional text section
+  yachtAdditionalText: {
+    paddingHorizontal: 50,
+    paddingTop: 24,
+    paddingBottom: 0,
+    backgroundColor: colors.white,
+  },
+  yachtAdditionalTextContent: {
+    fontSize: 11,
+    color: colors.text,
+    lineHeight: 1.6,
+    textAlign: 'center',
+  },
+  // Yacht price section (in left column)
+  yachtPriceSection: {
+    marginTop: 20,
+  },
+  yachtPriceAmount: {
+    fontSize: 32,
+    fontWeight: 700,
+    color: colors.text,
+  },
+  yachtPriceLabel: {
+    fontSize: 10,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 6,
+  },
+  // Horizontal separator
+  yachtSeparatorLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    marginHorizontal: 40,
+    marginTop: 30,
+    marginBottom: 20,
+  },
+  // Yacht notes
+  yachtNotesSection: {
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+  },
+  yachtNotesLabel: {
+    fontSize: 8,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  yachtNotesText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    lineHeight: 1.5,
+  },
+  // Yacht footer
+  yachtFooter: {
+    backgroundColor: colors.navyDark,
+    paddingVertical: 28,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    marginTop: 0,
+  },
+  yachtFooterBrand: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: colors.white,
+    letterSpacing: 2.5,
+    marginBottom: 5,
+  },
+  yachtFooterTagline: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
+  yachtFooterValidity: {
+    fontSize: 10,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  yachtFooterContact: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
+
+  // ==================== CAR STYLES ====================
+  carPage: {
+    fontFamily: 'Helvetica',
+    fontSize: 10,
+    paddingTop: 0,
+    paddingBottom: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
+  },
+  carContainer: {
+    backgroundColor: colors.white,
+  },
+  // Car hero section
+  carHero: {
+    position: 'relative',
+    height: 280,
+    backgroundColor: '#f5f5f5',
+  },
+  carHeroImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  carLogoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 70,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  carLogo: {
+    width: 120,
+    height: 120,
+    objectFit: 'contain',
+  },
+  carBanner: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.navyDark,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  carBannerText: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: colors.white,
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
+  // Car client section
+  carClientSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 28,
+    paddingBottom: 22,
+    paddingHorizontal: 40,
+  },
+  carClientBox: {
+    flex: 1,
+  },
+  carClientLabelBox: {
+    backgroundColor: colors.text,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    alignSelf: 'flex-start',
+  },
+  carClientLabel: {
+    fontSize: 8,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: 600,
+  },
+  carClientName: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.text,
+    marginBottom: 3,
+  },
+  carClientEmail: {
+    fontSize: 9,
+    color: colors.textSecondary,
+  },
+  carDateBox: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  carDateLabelBox: {
+    backgroundColor: colors.text,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+  },
+  carDateLabel: {
+    fontSize: 8,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontWeight: 600,
+  },
+  carDate: {
+    fontSize: 14,
+    fontWeight: 600,
+    color: colors.text,
+    marginBottom: 3,
+    textAlign: 'right',
+  },
+  carQuoteNum: {
+    fontSize: 9,
+    color: colors.textSecondary,
+    textAlign: 'right',
+  },
+  // Car route section
+  carRouteSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 40,
+    gap: 20,
+  },
+  carRouteLabel: {
+    fontSize: 8,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  carRouteText: {
+    fontSize: 24,
+    fontWeight: 700,
+    color: colors.text,
+    textTransform: 'uppercase',
+  },
+  carRouteArrow: {
+    fontSize: 16,
+    color: colors.textMuted,
+    marginHorizontal: 0,
+  },
+  carRouteColumn: {
+    alignItems: 'center',
+  },
+  // Car name header
+  carNameSection: {
+    backgroundColor: colors.navyDark,
+    paddingVertical: 20,
+    paddingHorizontal: 50,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  carNameLeft: {
+    flex: 1,
+  },
+  carNameText: {
+    fontSize: 20,
+    fontWeight: 700,
+    color: colors.white,
+    marginBottom: 2,
+  },
+  carModelText: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.65)',
+  },
+  carPassengersText: {
+    fontSize: 12,
+    color: colors.white,
+    fontWeight: 600,
+  },
+  // Car main image with label overlay
+  carImageContainer: {
+    position: 'relative',
+    width: '100%',
+    height: 280,
+  },
+  carMainImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+  },
+  carImageLabel: {
+    position: 'absolute',
+    top: 30,
+    left: 30,
+    backgroundColor: colors.navyDark,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  carImageLabelIcon: {
+    width: 4,
+    height: 4,
+    backgroundColor: colors.white,
+    borderRadius: 2,
+    marginRight: 8,
+  },
+  carImageLabelText: {
+    fontSize: 11,
+    color: colors.white,
+    fontWeight: 600,
+  },
+  // Car details and content section
+  carContentSection: {
+    flexDirection: 'row',
+    paddingVertical: 35,
+    paddingHorizontal: 50,
+    gap: 35,
+  },
+  carContentLeft: {
+    flex: 1,
+  },
+  carDetailItem: {
+    marginBottom: 18,
+  },
+  carDetailLabel: {
+    fontSize: 10,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  carDetailValue: {
+    fontSize: 16,
+    fontWeight: 600,
+    color: colors.text,
+  },
+  carDescText: {
+    fontSize: 10,
+    color: colors.text,
+    lineHeight: 1.65,
+    marginTop: 20,
+    textAlign: 'left',
+  },
+  carContentRight: {
+    width: 220,
+  },
+  carSecondaryImage: {
+    width: '100%',
+    height: 180,
+    objectFit: 'cover',
+    marginBottom: 20,
+  },
+  // Car price box
+  carPriceBox: {
+    backgroundColor: '#f9fafb',
+    padding: 20,
+    alignItems: 'center',
+  },
+  carPriceAmount: {
+    fontSize: 32,
+    fontWeight: 700,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  carPriceLabel: {
+    fontSize: 9,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+  },
+  // Car separator
+  carSeparatorLine: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    marginHorizontal: 40,
+    marginVertical: 20,
+  },
+  // Car notes section
+  carNotesSection: {
+    paddingVertical: 18,
+    paddingHorizontal: 40,
+  },
+  carNotesLabel: {
+    fontSize: 8,
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  carNotesText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    lineHeight: 1.5,
+  },
+  // Car footer
+  carFooter: {
+    backgroundColor: colors.navyDark,
+    paddingVertical: 28,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    marginTop: 0,
+  },
+  carFooterBrand: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: colors.white,
+    letterSpacing: 2.5,
+    marginBottom: 5,
+  },
+  carFooterTagline: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.6)',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+    marginBottom: 16,
+  },
+  carFooterValidity: {
+    fontSize: 10,
+    color: colors.white,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  carFooterContact: {
+    fontSize: 9,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+  },
 })
 
 interface QuotePDFBuilderProps {
@@ -456,7 +1157,7 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
     if (override?.display_images && override.display_images.length > 0) {
       return override.display_images.slice(0, 2)
     }
-    return originalImages.slice(0, 2)
+    return (originalImages || []).slice(0, 2)
   }
 
   // Default terms
@@ -472,6 +1173,328 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
     return details.some(d => d.label === 'Departure Code' || d.label === 'Arrival Code')
   }
 
+  // Check if this is a yacht quote
+  const isYachtQuote = customization?.header_icon === 'yacht'
+
+  // ==================== YACHT LAYOUT ====================
+  if (isYachtQuote) {
+    // Extract route info
+    const departurePort = customization?.route?.departure_city || 'MIAMI'
+    const destination = customization?.route?.arrival_city || 'BAHAMAS'
+
+    // Additional text (like "This boat has been used exclusively...")
+    const additionalText = customization?.custom_notes || ''
+
+    return (
+      <Document>
+        <Page size="A4" style={styles.yachtPage}>
+          <View style={styles.yachtContainer}>
+            {/* Hero Section with Logo */}
+            <View style={styles.yachtHero}>
+              <Image src={YACHT_HERO_IMAGE_URL} style={styles.yachtHeroImage} />
+              <View style={styles.yachtLogoOverlay}>
+                <Image src={LOGO_URL} style={styles.yachtLogo} />
+              </View>
+              <View style={styles.yachtBanner}>
+                <Text style={styles.yachtBannerText}>PRIVATE YACHT PROPOSAL</Text>
+              </View>
+            </View>
+
+            {/* Client Info and Date */}
+            <View style={styles.yachtClientSection}>
+              <View style={styles.yachtClientBox}>
+                <View style={styles.yachtClientLabelBox}>
+                  <Text style={styles.yachtClientLabel}>Prepared for:</Text>
+                </View>
+                <Text style={styles.yachtClientName}>{quote.client_name}</Text>
+                <Text style={styles.yachtClientEmail}>{quote.client_email}</Text>
+              </View>
+              <View style={styles.yachtDateBox}>
+                <View style={styles.yachtDateLabelBox}>
+                  <Text style={styles.yachtDateLabel}>Date:</Text>
+                </View>
+                <Text style={styles.yachtDate}>{formatDate(quote.created_at)}</Text>
+                <Text style={styles.yachtQuoteNum}>{quote.quote_number}</Text>
+              </View>
+            </View>
+
+            {/* Dotted Line */}
+            <View style={styles.yachtDottedLine} />
+
+            {/* Loop through all yacht service items (max 5) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((serviceItem, idx) => {
+              if (!serviceItem) return null
+
+              const override = getServiceOverride(serviceItem.id || '')
+              const displayImages = getDisplayImages(serviceItem.id || '', serviceItem.images || [])
+              const displayName = override?.display_name || serviceItem.service_name || 'Yacht Charter'
+              const displayDescription = override?.display_description || serviceItem.description || ''
+              const passengers = override?.passengers || '15'
+              const duration = override?.flight_time || '8h'
+              const servicesList = override?.services_list || ['Crew & amenities', 'Catering & beverages']
+              // Get route info for this yacht (use override if exists, otherwise use global)
+              const yachtDeparture = override?.departure_city || customization?.route?.departure_city || 'MIAMI'
+              const yachtDestination = override?.arrival_city || customization?.route?.arrival_city || 'BAHAMAS'
+
+              return (
+                <View key={serviceItem.id} style={{ marginTop: idx > 0 ? 30 : 0 }}>
+                  {/* Yacht Name */}
+                  <View style={styles.yachtNameSection}>
+                    <Text style={styles.yachtNameText}>{displayName}</Text>
+                  </View>
+
+                  {/* Main Yacht Image */}
+                  {displayImages[0] && (
+                    <Image src={displayImages[0]} style={styles.yachtMainImage} />
+                  )}
+
+                  {/* Description Banner */}
+                  {displayDescription && (
+                    <View style={{ position: 'relative' }}>
+                      {/* White background layer only at bottom */}
+                      <View style={{
+                        backgroundColor: colors.navyDark,
+                        paddingVertical: 14,
+                        paddingHorizontal: 40,
+                        paddingBottom: 20,
+                      }}>
+                        <Text style={styles.yachtDescText}>{displayDescription}</Text>
+                      </View>
+                      {/* White chevron cutout at bottom */}
+                      <View style={{
+                        backgroundColor: colors.white,
+                        height: 20,
+                        marginTop: -20,
+                        marginHorizontal: 20,
+                      }} />
+                    </View>
+                  )}
+
+                  {/* Details Section with Two Columns */}
+                  <View style={styles.yachtDetailsSection}>
+                    {/* Left Column - Details and Price */}
+                    <View style={styles.yachtDetailsLeft}>
+                      <View style={styles.yachtDetailItem}>
+                        <Text style={styles.yachtDetailLabel}>ROUTE</Text>
+                        <Text style={styles.yachtDetailValue}>{yachtDeparture} → {yachtDestination}</Text>
+                      </View>
+                      <View style={styles.yachtDetailItem}>
+                        <Text style={styles.yachtDetailLabel}>PASSENGERS</Text>
+                        <Text style={styles.yachtDetailValue}>{passengers}</Text>
+                      </View>
+                      <View style={styles.yachtDetailItem}>
+                        <Text style={styles.yachtDetailLabel}>DURATION</Text>
+                        <Text style={styles.yachtDetailValue}>{duration}</Text>
+                      </View>
+                      <View style={styles.yachtDetailItem}>
+                        <Text style={styles.yachtDetailLabel}>SERVICES</Text>
+                        <View style={styles.yachtServicesList}>
+                          {servicesList.map((service, serviceIdx) => (
+                            <Text key={serviceIdx} style={styles.yachtServicesItem}>· {service}</Text>
+                          ))}
+                        </View>
+                      </View>
+
+                      {/* Price in Left Column */}
+                      <View style={styles.yachtPriceSection}>
+                        <Text style={styles.yachtPriceAmount}>{formatCurrency(serviceItem.price)}</Text>
+                        <Text style={styles.yachtPriceLabel}>PRICE</Text>
+                      </View>
+                    </View>
+
+                    {/* Right Column - Secondary Image and Additional Text */}
+                    <View style={styles.yachtDetailsRight}>
+                      {displayImages[1] && (
+                        <Image src={displayImages[1]} style={styles.yachtSecondaryImage} />
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Separator between yachts */}
+                  {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                    <View style={styles.yachtSeparatorLine} />
+                  )}
+                </View>
+              )
+            })}
+
+            {/* Separator before notes */}
+            <View style={styles.yachtSeparatorLine} />
+
+            {/* Notes Section */}
+            {(additionalText || quote.notes) && (
+              <View style={styles.yachtNotesSection}>
+                <Text style={styles.yachtNotesLabel}>NOTES:</Text>
+                <Text style={styles.yachtNotesText}>{additionalText || quote.notes}</Text>
+              </View>
+            )}
+
+            {/* Footer */}
+            <View style={styles.yachtFooter}>
+              <Text style={styles.yachtFooterBrand}>{company.name}</Text>
+              <Text style={styles.yachtFooterTagline}>{company.tagline}</Text>
+              <Text style={styles.yachtFooterValidity}>
+                QUOTE VALID UNTIL {formatDate(quote.expiration_date).toUpperCase()}
+              </Text>
+              <Text style={styles.yachtFooterContact}>
+                {company.email} · {company.website}
+              </Text>
+            </View>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
+
+  // Check if this is a car quote
+  const isCarQuote = customization?.header_icon === 'car'
+
+  // ==================== CAR LAYOUT ====================
+  if (isCarQuote) {
+    // Extract route info
+    const pickup = customization?.route?.departure_city || 'AIRPORT'
+    const dropoff = customization?.route?.arrival_city || 'HOTEL'
+
+    return (
+      <Document>
+        <Page size="A4" style={styles.carPage}>
+          <View style={styles.carContainer}>
+            {/* Hero Section with Logo */}
+            <View style={styles.carHero}>
+              <Image src={CAR_HERO_IMAGE_URL} style={styles.carHeroImage} />
+              <View style={styles.carLogoOverlay}>
+                <Image src={LOGO_URL} style={styles.carLogo} />
+              </View>
+              <View style={styles.carBanner}>
+                <Text style={styles.carBannerText}>CARS RENTAL PROPOSAL</Text>
+              </View>
+            </View>
+
+            {/* Client Info and Date */}
+            <View style={styles.carClientSection}>
+              <View style={styles.carClientBox}>
+                <View style={styles.carClientLabelBox}>
+                  <Text style={styles.carClientLabel}>PREPARED FOR:</Text>
+                </View>
+                <Text style={styles.carClientName}>{quote.client_name}</Text>
+                <Text style={styles.carClientEmail}>{quote.client_email}</Text>
+              </View>
+              <View style={styles.carDateBox}>
+                <View style={styles.carDateLabelBox}>
+                  <Text style={styles.carDateLabel}>EXCLUSIVE RATES</Text>
+                </View>
+                <Text style={styles.carDate}>{formatDate(quote.created_at)}</Text>
+                <Text style={styles.carQuoteNum}>{quote.quote_number}</Text>
+              </View>
+            </View>
+
+            {/* Loop through all car service items (max 5) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((serviceItem, idx) => {
+              if (!serviceItem) return null
+
+              const override = getServiceOverride(serviceItem.id || '')
+              const displayImages = getDisplayImages(serviceItem.id || '', serviceItem.images || [])
+              const displayName = override?.display_name || serviceItem.service_name || 'Luxury Car'
+              const carModel = override?.jet_model || '' // reusing jet_model field for car model
+              const displayDescription = override?.display_description || serviceItem.description || ''
+              const passengers = override?.passengers || '4'
+              const duration = override?.flight_time || '5 days' // reusing flight_time for duration
+              // Get route info for this car (use override if exists, otherwise use global)
+              const carPickup = override?.departure_city || customization?.route?.departure_city || 'AIRPORT'
+              const carDropoff = override?.arrival_city || customization?.route?.arrival_city || 'HOTEL'
+
+              return (
+                <View key={serviceItem.id} style={{ marginTop: idx > 0 ? 40 : 0 }}>
+                  {/* Car Name Header */}
+                  <View style={styles.carNameSection}>
+                    <View style={styles.carNameLeft}>
+                      <Text style={styles.carNameText}>{displayName}</Text>
+                      {carModel && <Text style={styles.carModelText}>{carModel}</Text>}
+                    </View>
+                    <Text style={styles.carPassengersText}>{passengers} Passengers</Text>
+                  </View>
+
+                  {/* Main Car Image */}
+                  {displayImages[0] && (
+                    <View style={styles.carImageContainer}>
+                      <Image src={displayImages[0]} style={styles.carMainImage} />
+                    </View>
+                  )}
+
+                  {/* Content Section: Details + Description on Left, Image + Price on Right */}
+                  <View style={styles.carContentSection}>
+                    {/* Left Column - Details and Description */}
+                    <View style={styles.carContentLeft}>
+                      <View style={styles.carDetailItem}>
+                        <Text style={styles.carDetailLabel}>ROUTE</Text>
+                        <Text style={styles.carDetailValue}>{carPickup} → {carDropoff}</Text>
+                      </View>
+                      <View style={styles.carDetailItem}>
+                        <Text style={styles.carDetailLabel}>PASSENGERS</Text>
+                        <Text style={styles.carDetailValue}>{passengers}</Text>
+                      </View>
+                      <View style={styles.carDetailItem}>
+                        <Text style={styles.carDetailLabel}>DURATION</Text>
+                        <Text style={styles.carDetailValue}>{duration}</Text>
+                      </View>
+
+                      {/* Description */}
+                      {displayDescription && (
+                        <Text style={styles.carDescText}>{displayDescription}</Text>
+                      )}
+                    </View>
+
+                    {/* Right Column - Image and Price */}
+                    <View style={styles.carContentRight}>
+                      {displayImages[1] && (
+                        <Image src={displayImages[1]} style={styles.carSecondaryImage} />
+                      )}
+
+                      {/* Price Box */}
+                      <View style={styles.carPriceBox}>
+                        <Text style={styles.carPriceAmount}>{formatCurrency(serviceItem.price)}</Text>
+                        <Text style={styles.carPriceLabel}>TOTAL</Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Separator between cars */}
+                  {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                    <View style={styles.carSeparatorLine} />
+                  )}
+                </View>
+              )
+            })}
+
+            {/* Separator before notes */}
+            <View style={styles.carSeparatorLine} />
+
+            {/* Notes Section */}
+            {quote.notes && (
+              <View style={styles.carNotesSection}>
+                <Text style={styles.carNotesLabel}>NOTES:</Text>
+                <Text style={styles.carNotesText}>{quote.notes}</Text>
+              </View>
+            )}
+
+            {/* Footer */}
+            <View style={styles.carFooter}>
+              <Text style={styles.carFooterBrand}>{company.name}</Text>
+              <Text style={styles.carFooterTagline}>{company.tagline}</Text>
+              <Text style={styles.carFooterValidity}>
+                QUOTE VALID UNTIL {formatDate(quote.expiration_date).toUpperCase()}
+              </Text>
+              <Text style={styles.carFooterContact}>
+                {company.email} · {company.website}
+              </Text>
+            </View>
+          </View>
+        </Page>
+      </Document>
+    )
+  }
+
+  // ==================== DEFAULT TICKET LAYOUT ====================
   return (
     <Document>
       <Page size="A4" style={styles.page}>

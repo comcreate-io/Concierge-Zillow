@@ -192,11 +192,43 @@ export default function QuoteViewPage() {
     setIsDownloading(true)
 
     try {
-      const ticketElement = pdfPreviewRef.current.querySelector('.pdf-ticket') as HTMLElement
+      // Find the preview element (yacht, car, or jet)
+      const yachtElement = pdfPreviewRef.current.querySelector('[data-preview="yacht"]') as HTMLElement
+      const carElement = pdfPreviewRef.current.querySelector('[data-preview="car"]') as HTMLElement
+      const jetElement = pdfPreviewRef.current.querySelector('[data-preview="jet"]') as HTMLElement
 
-      if (!ticketElement) {
-        throw new Error('Could not find ticket preview element')
+      const previewElement = yachtElement || carElement || jetElement
+
+      if (!previewElement) {
+        throw new Error('Could not find preview element')
       }
+
+      // Store original styles and set fixed width for consistent PDF
+      const originalStyle = previewElement.style.cssText
+      const isYacht = !!yachtElement
+      const isCar = !!carElement
+      const previewWidth = (isYacht || isCar) ? '595px' : '420px'
+
+      previewElement.style.width = previewWidth
+      previewElement.style.minWidth = previewWidth
+      previewElement.style.maxWidth = previewWidth
+
+      // Wait for re-render with fixed width
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Preload the header image with CORS
+      const headerImageUrl = isYacht
+        ? 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767891666/yacht_header01_vwasld.png'
+        : 'https://res.cloudinary.com/dku1gnuat/image/upload/v1767797886/quoteCover_qmol4g.jpg'
+      await new Promise<void>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve()
+        img.onerror = () => resolve()
+        img.src = headerImageUrl
+      })
+
+      const ticketElement = previewElement
 
       // Wait for images to load
       const images = ticketElement.querySelectorAll('img')
@@ -233,60 +265,67 @@ export default function QuoteViewPage() {
       ticketElement.style.backgroundColor = convertToHex(rootComputed.backgroundColor)
       ticketElement.style.color = convertToHex(rootComputed.color)
 
-      // Fix image containers
-      const imageContainers = ticketElement.querySelectorAll('.h-48')
-      imageContainers.forEach((container) => {
-        if (container instanceof HTMLElement) {
-          const rect = container.getBoundingClientRect()
-          originalStyles.set(container, container.style.cssText)
-          container.style.width = rect.width + 'px'
-          container.style.height = rect.height + 'px'
-          container.style.overflow = 'hidden'
-        }
-      })
-
-      // Fix all images
+      // Fix object-fit for html2canvas (it doesn't support object-fit CSS)
       const allImgs = ticketElement.querySelectorAll('img')
       allImgs.forEach((img) => {
         if (img instanceof HTMLImageElement) {
-          const rect = img.getBoundingClientRect()
           const computed = window.getComputedStyle(img)
-          originalStyles.set(img, img.style.cssText)
+          const objectFit = computed.objectFit
 
-          const isLogo = computed.objectFit === 'contain' || img.alt === 'Cadiz & Lluis'
+          if (!originalStyles.has(img)) {
+            originalStyles.set(img, img.style.cssText)
+          }
 
-          if (isLogo) {
-            img.style.maxWidth = rect.width + 'px'
-            img.style.maxHeight = rect.height + 'px'
-            img.style.width = 'auto'
-            img.style.height = 'auto'
-            img.style.objectFit = 'contain'
-          } else {
+          // Handle different image types separately
+          const isHeaderBg = img.alt === 'Header'
+          const isLogo = img.alt === 'Cadiz & Lluis'
+          const isYachtImage = img.alt === 'Yacht' || img.alt === 'Yacht Interior'
+
+          if (isHeaderBg) {
+            // Header background: simulate object-fit cover
             const parent = img.parentElement
             if (parent) {
               const parentRect = parent.getBoundingClientRect()
-              const imgNaturalWidth = img.naturalWidth || rect.width
-              const imgNaturalHeight = img.naturalHeight || rect.height
-              const containerRatio = parentRect.width / parentRect.height
-              const imageRatio = imgNaturalWidth / imgNaturalHeight
+              const imgNaturalWidth = img.naturalWidth || img.width
+              const imgNaturalHeight = img.naturalHeight || img.height
 
-              if (imageRatio > containerRatio) {
-                const scaledWidth = parentRect.height * imageRatio
-                img.style.width = scaledWidth + 'px'
-                img.style.height = parentRect.height + 'px'
-                img.style.marginLeft = -((scaledWidth - parentRect.width) / 2) + 'px'
-                img.style.marginTop = '0'
-              } else {
-                const scaledHeight = parentRect.width / imageRatio
-                img.style.width = parentRect.width + 'px'
-                img.style.height = scaledHeight + 'px'
-                img.style.marginTop = -((scaledHeight - parentRect.height) / 2) + 'px'
-                img.style.marginLeft = '0'
+              if (imgNaturalWidth && imgNaturalHeight) {
+                const parentAspect = parentRect.width / parentRect.height
+                const imgAspect = imgNaturalWidth / imgNaturalHeight
+
+                if (imgAspect > parentAspect) {
+                  // Image is wider - fit by height
+                  img.style.width = 'auto'
+                  img.style.height = '100%'
+                  img.style.maxWidth = 'none'
+                } else {
+                  // Image is taller - fit by width
+                  img.style.width = '100%'
+                  img.style.height = 'auto'
+                  img.style.maxHeight = 'none'
+                }
               }
-              img.style.objectFit = 'none'
+            }
+          } else if (isLogo) {
+            // Logo: maintain aspect ratio using natural dimensions
+            const naturalWidth = img.naturalWidth
+            const naturalHeight = img.naturalHeight
+
+            if (naturalWidth && naturalHeight) {
+              const aspectRatio = naturalWidth / naturalHeight
+              const targetWidth = 120 // desired width in px
+              const targetHeight = targetWidth / aspectRatio
+
+              img.style.width = targetWidth + 'px'
+              img.style.height = targetHeight + 'px'
               img.style.maxWidth = 'none'
               img.style.maxHeight = 'none'
+              img.style.minWidth = 'auto'
+              img.style.minHeight = 'auto'
             }
+          } else if (isYachtImage) {
+            // Yacht images: don't modify at all, let them render naturally
+            // Just keep them as-is
           }
         }
       })
@@ -386,10 +425,13 @@ export default function QuoteViewPage() {
         el.style.cssText = originalStyle
       })
 
+      // Restore original preview width
+      previewElement.style.cssText = originalStyle
+
       // Create PDF
       const imgWidth = canvas.width
       const imgHeight = canvas.height
-      const pdfWidth = 106
+      const pdfWidth = (isYacht || isCar) ? 210 : 106 // A4 width for yacht/car, custom for jet
       const pdfHeight = (imgHeight / imgWidth) * pdfWidth
 
       const pdf = new jsPDF({
@@ -946,27 +988,358 @@ export default function QuoteViewPage() {
       )}
 
       {/* Hidden PDF Preview for Download */}
-      <div ref={pdfPreviewRef} className="fixed left-[-9999px] top-0" style={{ width: '420px' }}>
-        <div className="pdf-ticket bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
-          {/* Header Image with Logo */}
-          <div className="header-image-container relative" style={{ width: '100%', height: '220px', overflow: 'hidden' }}>
-            <img
-              src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767797886/quoteCover_qmol4g.jpg"
-              alt="Header"
-              crossOrigin="anonymous"
-              style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
-            />
-            {/* Logo Overlay */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <img
-                  src="/logo/CL Balck LOGO .png"
-                  alt="Cadiz & Lluis"
-                  className="h-16 w-auto object-contain"
-                />
+      <div ref={pdfPreviewRef} className="fixed left-[-9999px] top-0">
+        {quote.pdf_customization?.header_icon === 'yacht' ? (
+          /* ========== YACHT PREVIEW ========== */
+          <div data-preview="yacht" className="max-w-[595px] mx-auto bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            {/* Hero Section with Logo */}
+            <div className="relative" style={{ height: '280px', overflow: 'hidden' }}>
+              <img
+                src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767891666/yacht_header01_vwasld.png"
+                alt="Header"
+                crossOrigin="anonymous"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              <div className="absolute flex items-center justify-center" style={{ top: 0, left: 0, right: 0, bottom: '70px' }}>
+                <div className="text-center">
+                  <img
+                    src="/logo/CL Balck LOGO .png"
+                    alt="Cadiz & Lluis"
+                    style={{ width: '120px', height: '120px', objectFit: 'contain', margin: '0 auto' }}
+                  />
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0" style={{ backgroundColor: '#1a2332', padding: '16px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: 'white', letterSpacing: '1.8px' }}>PRIVATE YACHT PROPOSAL</p>
               </div>
             </div>
+
+            {/* Client Info and Date */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '32px 50px 26px' }}>
+              <div>
+                <div style={{ backgroundColor: '#1a1a1a', padding: '8px 14px', borderTopLeftRadius: '4px', borderTopRightRadius: '8px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px', marginBottom: '10px', display: 'inline-block' }}>
+                  <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Prepared for:</p>
+                </div>
+                <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '4px' }}>{quote.client_name}</p>
+                <p style={{ fontSize: '11px', color: '#6b7280' }}>{quote.client_email}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ backgroundColor: '#1a1a1a', padding: '8px 14px', borderTopLeftRadius: '4px', borderTopRightRadius: '8px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px', marginBottom: '10px', display: 'inline-block' }}>
+                  <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Date:</p>
+                </div>
+                <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '4px' }}>
+                  {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+                <p style={{ fontSize: '11px', color: '#6b7280' }}>{quote.quote_number}</p>
+              </div>
+            </div>
+
+            {/* Dotted Line */}
+            <div style={{ borderBottom: '1px dashed #d1d5db', margin: '10px 50px' }}></div>
+
+            {/* Loop through yacht service items (max 5) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+              if (!item) return null
+              const override = quote.pdf_customization?.service_overrides?.[item.id] || {}
+              const images = item.images || []
+              const displayImages = (override.display_images && override.display_images.length > 0)
+                ? override.display_images.slice(0, 2)
+                : images.slice(0, 2)
+              const displayName = override.display_name || item.service_name || 'Yacht Charter'
+              const displayDescription = override.display_description || ''
+              const passengers = override.passengers || '15'
+              const duration = override.flight_time || '8h'
+              const servicesList = override.services_list || ['Crew & amenities', 'Catering & beverages']
+              // Get route for this yacht
+              const yachtDeparture = override.departure_city || quote.pdf_customization?.route?.departure_city || 'MIAMI'
+              const yachtDestination = override.arrival_city || quote.pdf_customization?.route?.arrival_city || 'BAHAMAS'
+
+              return (
+                <div key={item.id} style={{ marginTop: idx > 0 ? '30px' : '0' }}>
+                  {/* Yacht Name */}
+                  <div style={{ backgroundColor: '#1a2332', padding: '30px 50px', textAlign: 'center' }}>
+                    <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', lineHeight: '1.2', letterSpacing: '1.8px' }}>{displayName}</p>
+                  </div>
+
+                  {/* Main Yacht Image */}
+                  {displayImages[0] && (
+                    <img
+                      src={displayImages[0]}
+                      alt="Yacht"
+                      style={{ width: '100%', height: '300px', objectFit: 'cover', display: 'block' }}
+                    />
+                  )}
+
+                  {/* Description Banner with Chevron Bottom */}
+                  {displayDescription && (
+                    <div style={{ position: 'relative' }}>
+                      <div style={{
+                        backgroundColor: '#1a2332',
+                        padding: '18px 60px',
+                        textAlign: 'center',
+                        clipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 30px) 100%, 30px 100%, 0 calc(100% - 20px))',
+                        WebkitClipPath: 'polygon(0 0, 100% 0, 100% calc(100% - 20px), calc(100% - 30px) 100%, 30px 100%, 0 calc(100% - 20px))'
+                      }}>
+                        <p style={{ fontSize: '13px', color: 'white' }}>{displayDescription}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Details Section with Two Columns */}
+                  <div style={{ display: 'flex', padding: '40px 50px', gap: '28px' }}>
+                    {/* Left Column - Details and Price */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ marginBottom: '24px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>ROUTE</p>
+                        <p style={{ fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>{yachtDeparture} → {yachtDestination}</p>
+                      </div>
+                      <div style={{ marginBottom: '24px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>PASSENGERS</p>
+                        <p style={{ fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>{passengers}</p>
+                      </div>
+                      <div style={{ marginBottom: '24px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>DURATION</p>
+                        <p style={{ fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>{duration}</p>
+                      </div>
+                      <div style={{ marginBottom: '28px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>SERVICES</p>
+                        {servicesList.filter(s => s).map((service, serviceIdx) => (
+                          <p key={serviceIdx} style={{ fontSize: '12px', color: '#1a1a1a', marginBottom: '5px' }}>· {service}</p>
+                        ))}
+                      </div>
+
+                      {/* Price in Left Column */}
+                      <div style={{ marginTop: '24px' }}>
+                        <p style={{ fontSize: '36px', fontWeight: 700, color: '#1a1a1a', marginBottom: '6px' }}>
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
+                        </p>
+                        <p style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>PRICE</p>
+                      </div>
+                    </div>
+
+                    {/* Right Column - Secondary Image and Additional Text */}
+                    <div style={{ width: '280px' }}>
+                      {displayImages[1] && (
+                        <img
+                          src={displayImages[1]}
+                          alt="Yacht Interior"
+                          style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block', marginBottom: '24px' }}
+                        />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Separator between yachts */}
+                  {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                    <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Separator before notes */}
+            <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
+
+            {/* Notes Section */}
+            {(quote.pdf_customization?.custom_notes || quote.notes) && (
+              <div style={{ padding: '18px 40px' }}>
+                <p style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>NOTES:</p>
+                <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{quote.pdf_customization?.custom_notes || quote.notes}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div style={{ backgroundColor: '#1a2332', padding: '36px 50px', textAlign: 'center' }}>
+              <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', letterSpacing: '2.8px', marginBottom: '7px' }}>CADIZ & LLUIS</p>
+              <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px' }}>LUXURY LIVING</p>
+              <p style={{ fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
+                QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+              </p>
+              <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
+              </p>
+            </div>
           </div>
+        ) : quote.pdf_customization?.header_icon === 'car' ? (
+          /* ========== CAR PREVIEW ========== */
+          <div data-preview="car" className="max-w-[595px] mx-auto bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            {/* Hero Section with Logo */}
+            <div className="relative" style={{ height: '280px', overflow: 'hidden' }}>
+              <img
+                src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767891667/carss_1_q4pubs.png"
+                alt="Header"
+                crossOrigin="anonymous"
+                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+              />
+              <div className="absolute flex items-center justify-center" style={{ top: 0, left: 0, right: 0, bottom: '70px' }}>
+                <div className="text-center">
+                  <img
+                    src="/logo/CL Balck LOGO .png"
+                    alt="Cadiz & Lluis"
+                    style={{ width: '120px', height: '120px', objectFit: 'contain', margin: '0 auto' }}
+                  />
+                </div>
+              </div>
+              <div className="absolute bottom-0 left-0 right-0" style={{ backgroundColor: '#1a2332', padding: '16px 20px', textAlign: 'center' }}>
+                <p style={{ fontSize: '14px', fontWeight: 700, color: 'white', letterSpacing: '1.8px', textTransform: 'uppercase' }}>CARS RENTAL PROPOSAL</p>
+              </div>
+            </div>
+
+            {/* Client Info and Date */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', padding: '28px 40px 22px' }}>
+              <div>
+                <div style={{ backgroundColor: '#1a1a1a', padding: '4px 10px', marginBottom: '8px', display: 'inline-block' }}>
+                  <p style={{ fontSize: '8px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>PREPARED FOR:</p>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', marginBottom: '3px' }}>{quote.client_name}</p>
+                <p style={{ fontSize: '9px', color: '#6b7280' }}>{quote.client_email}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ backgroundColor: '#1a1a1a', padding: '4px 10px', marginBottom: '8px', display: 'inline-block' }}>
+                  <p style={{ fontSize: '8px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>EXCLUSIVE RATES</p>
+                </div>
+                <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', marginBottom: '3px' }}>
+                  {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </p>
+                <p style={{ fontSize: '9px', color: '#6b7280' }}>{quote.quote_number}</p>
+              </div>
+            </div>
+
+            {/* Loop through car service items (max 5) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+              if (!item) return null
+              const override = quote.pdf_customization?.service_overrides?.[item.id] || {}
+              const images = item.images || []
+              const displayImages = (override.display_images && override.display_images.length > 0)
+                ? override.display_images.slice(0, 2)
+                : images.slice(0, 2)
+              const displayName = override.display_name || item.service_name || 'Luxury Car'
+              const carModel = override.jet_model || '' // reusing jet_model field
+              const displayDescription = override.display_description || ''
+              const passengers = override.passengers || '4'
+              const duration = override.flight_time || '5 days'
+              // Get route for this car
+              const carPickup = override.departure_city || quote.pdf_customization?.route?.departure_city || 'AIRPORT'
+              const carDropoff = override.arrival_city || quote.pdf_customization?.route?.arrival_city || 'HOTEL'
+
+              return (
+                <div key={item.id} style={{ marginTop: idx > 0 ? '40px' : '0' }}>
+                  {/* Car Name Header */}
+                  <div style={{ backgroundColor: '#1a2332', padding: '20px 50px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ flex: 1 }}>
+                      <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', lineHeight: '1.2', marginBottom: '2px' }}>{displayName}</p>
+                      {carModel && <p style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.65)' }}>{carModel}</p>}
+                    </div>
+                    <p style={{ fontSize: '12px', color: 'white', fontWeight: 600 }}>{passengers} Passengers</p>
+                  </div>
+
+                  {/* Main Car Image */}
+                  {displayImages[0] && (
+                    <div style={{ height: '280px' }}>
+                      <img
+                        src={displayImages[0]}
+                        alt="Car"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </div>
+                  )}
+
+                  {/* Content Section: Details + Description on Left, Image + Price on Right */}
+                  <div style={{ display: 'flex', padding: '35px 50px', gap: '35px' }}>
+                    {/* Left Column - Details and Description */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ marginBottom: '18px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>ROUTE</p>
+                        <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>{carPickup} → {carDropoff}</p>
+                      </div>
+                      <div style={{ marginBottom: '18px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>PASSENGERS</p>
+                        <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>{passengers}</p>
+                      </div>
+                      <div style={{ marginBottom: '18px' }}>
+                        <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>DURATION</p>
+                        <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>{duration}</p>
+                      </div>
+
+                      {/* Description */}
+                      {displayDescription && (
+                        <p style={{ fontSize: '10px', color: '#1a1a1a', lineHeight: '1.65', marginTop: '20px', textAlign: 'left' }}>{displayDescription}</p>
+                      )}
+                    </div>
+
+                    {/* Right Column - Image and Price */}
+                    <div style={{ width: '220px' }}>
+                      {displayImages[1] && (
+                        <img
+                          src={displayImages[1]}
+                          alt="Car Interior"
+                          style={{ width: '100%', height: '180px', objectFit: 'cover', display: 'block', marginBottom: '20px' }}
+                        />
+                      )}
+
+                      {/* Price Box */}
+                      <div style={{ backgroundColor: '#f9fafb', padding: '20px', textAlign: 'center' }}>
+                        <p style={{ fontSize: '32px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px' }}>
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
+                        </p>
+                        <p style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px' }}>TOTAL</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Separator between cars */}
+                  {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                    <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Separator */}
+            <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 40px' }}></div>
+
+            {/* Notes Section */}
+            {quote.notes && (
+              <div style={{ padding: '18px 40px' }}>
+                <p style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>NOTES:</p>
+                <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{quote.notes}</p>
+              </div>
+            )}
+
+            {/* Footer */}
+            <div style={{ backgroundColor: '#1a2332', padding: '28px 40px', textAlign: 'center' }}>
+              <p style={{ fontSize: '18px', fontWeight: 700, color: 'white', letterSpacing: '2.5px', marginBottom: '5px' }}>CADIZ & LLUIS</p>
+              <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '1.8px', textTransform: 'uppercase', marginBottom: '16px' }}>LUXURY LIVING</p>
+              <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
+                QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+              </p>
+              <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* ========== JET/DEFAULT PREVIEW ========== */
+          <div data-preview="jet" className="max-w-[420px] mx-auto bg-white shadow-lg overflow-hidden" style={{ fontFamily: 'Inter, system-ui, sans-serif' }}>
+            {/* Header Image with Logo */}
+            <div className="header-image-container relative" style={{ width: '100%', height: '220px', overflow: 'hidden' }}>
+              <img
+                src="https://res.cloudinary.com/dku1gnuat/image/upload/v1767797886/quoteCover_qmol4g.jpg"
+                alt="Header"
+                crossOrigin="anonymous"
+                style={{ width: '100%', height: '220px', objectFit: 'cover', display: 'block' }}
+              />
+              {/* Logo Overlay */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <img
+                    src="/logo/CL Balck LOGO .png"
+                    alt="Cadiz & Lluis"
+                    className="h-16 w-auto object-contain"
+                  />
+                </div>
+              </div>
+            </div>
 
           {/* Title Section */}
           <div className="bg-white py-6 text-center">
@@ -1155,6 +1528,7 @@ export default function QuoteViewPage() {
             </p>
           </div>
         </div>
+        )}
       </div>
     </div>
   )
