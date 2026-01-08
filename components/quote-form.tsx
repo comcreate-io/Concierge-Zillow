@@ -124,6 +124,14 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
   const total = serviceItems.reduce((sum, item) => sum + (item.price || 0), 0)
 
   const addServiceItem = () => {
+    if (serviceItems.length >= 5) {
+      toast({
+        title: 'Maximum Reached',
+        description: 'You can only add up to 5 service items per proposal',
+        variant: 'destructive',
+      })
+      return
+    }
     setServiceItems([{ service_name: '', description: '', price: 0, images: [] }, ...serviceItems])
   }
 
@@ -505,10 +513,11 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
             variant="outline"
             size="sm"
             onClick={addServiceItem}
-            className="border-white/30 hover:bg-white/10 text-white"
+            disabled={serviceItems.length >= 5}
+            className="border-white/30 hover:bg-white/10 text-white disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Add Service
+            Add Service {serviceItems.length >= 5 && '(Max 5)'}
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -536,7 +545,16 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
                     }
                     setServiceItems(updated)
                   } else {
-                    // If no empty card, add at the top
+                    // If no empty card, check if we can add more
+                    if (serviceItems.length >= 5) {
+                      toast({
+                        title: 'Maximum Reached',
+                        description: 'You can only add up to 5 service items per proposal',
+                        variant: 'destructive',
+                      })
+                      return
+                    }
+                    // Add at the top
                     setServiceItems([
                       { service_name: suggestion.name, description: suggestion.desc, price: 0, images: [] },
                       ...serviceItems
