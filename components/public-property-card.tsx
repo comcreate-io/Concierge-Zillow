@@ -127,9 +127,9 @@ export function PublicPropertyCard({ property, clientId }: { property: Property;
                 </>
               )}
 
-              {/* Price Badge - Better mobile positioning */}
+              {/* Price Badge - Top right positioning */}
               {prices.length > 0 && (
-                <div className="absolute bottom-3 sm:bottom-4 left-3 sm:left-4 z-10">
+                <div className="absolute top-3 sm:top-4 right-3 sm:right-4 z-10">
                   <div className="flex flex-col gap-1">
                     {prices.slice(0, 2).map((price, index) => (
                       <div
