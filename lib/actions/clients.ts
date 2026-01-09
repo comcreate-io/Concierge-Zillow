@@ -35,6 +35,7 @@ export type ClientWithDetails = Client & {
     name: string
     email: string
   }
+  shared_with_manager_ids?: string[] // Array of manager IDs who have access to this client
 }
 
 export type ManagerProfile = {
@@ -254,18 +255,43 @@ export async function getAllClientsSystem() {
     return { error: assignmentsError.message }
   }
 
+  // Get all client shares to know which admins have access
+  const { data: shares, error: sharesError } = await supabase
+    .from('client_shares')
+    .select('client_id, shared_with_manager_id')
+
+  if (sharesError) {
+    return { error: sharesError.message }
+  }
+
   // Count properties per client
   const propertyCounts: Record<string, number> = {}
   assignments?.forEach((a: any) => {
     propertyCounts[a.client_id] = (propertyCounts[a.client_id] || 0) + 1
   })
 
-  // Merge property counts with client data
-  const clientsWithCounts = allClients?.map((client: any) => ({
-    ...client,
-    property_count: propertyCounts[client.id] || 0,
-    is_shared: false, // Not using shared concept in master view
-  })) || []
+  // Group shares by client_id
+  const clientShares: Record<string, string[]> = {}
+  shares?.forEach((share: any) => {
+    if (!clientShares[share.client_id]) {
+      clientShares[share.client_id] = []
+    }
+    clientShares[share.client_id].push(share.shared_with_manager_id)
+  })
+
+  // Merge property counts and shares with client data
+  const clientsWithCounts = allClients?.map((client: any) => {
+    // Admins with access = owner + shared_with managers
+    const sharedWithManagerIds = clientShares[client.id] || []
+    const allManagerIds = [client.manager_id, ...sharedWithManagerIds]
+
+    return {
+      ...client,
+      property_count: propertyCounts[client.id] || 0,
+      is_shared: false, // Not using shared concept in master view
+      shared_with_manager_ids: allManagerIds, // Include owner + shared managers
+    }
+  }) || []
 
   return { data: clientsWithCounts as ClientWithDetails[] }
 }

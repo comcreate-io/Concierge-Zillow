@@ -8,7 +8,7 @@ import { User } from '@supabase/supabase-js'
 import { LogOut, Menu, X, Home, Building2, UserCheck, User as UserIcon, FileText, Sparkles, Contact, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function MobileHeader({ user }: { user: User }) {
+export function MobileHeader({ user, isSuperAdmin = false }: { user: User; isSuperAdmin?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -28,7 +28,7 @@ export function MobileHeader({ user }: { user: User }) {
     }, 50)
   }
 
-  const navItems = [
+  const allNavItems = [
     {
       label: 'Profile',
       href: '/admin/profile',
@@ -45,7 +45,8 @@ export function MobileHeader({ user }: { user: User }) {
       label: 'All Clients',
       href: '/admin/clients-all',
       icon: Users,
-      active: pathname === '/admin/clients-all' || pathname.startsWith('/admin/client/')
+      active: pathname === '/admin/clients-all' || pathname.startsWith('/admin/client/'),
+      superAdminOnly: true
     },
     {
       label: 'Properties',
@@ -72,6 +73,14 @@ export function MobileHeader({ user }: { user: User }) {
       active: pathname === '/admin/quotes' || pathname.startsWith('/admin/quotes/')
     }
   ]
+
+  // Filter nav items based on role
+  const navItems = allNavItems.filter(item => {
+    if (item.superAdminOnly) {
+      return isSuperAdmin
+    }
+    return true
+  })
 
   return (
     <>

@@ -664,7 +664,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 150,
     objectFit: 'cover',
-    borderRadius: 0,
+    borderRadius: 8,
   },
   yachtImageContainer: {
     position: 'relative',
@@ -703,21 +703,22 @@ const styles = StyleSheet.create({
     lineHeight: 1.6,
     textAlign: 'center',
   },
-  // Yacht price section (in left column)
+  // Yacht price section (below secondary image)
   yachtPriceSection: {
-    marginTop: 20,
+    marginTop: 16,
+    alignItems: 'center',
   },
   yachtPriceAmount: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 700,
     color: colors.text,
+    marginBottom: 4,
   },
   yachtPriceLabel: {
-    fontSize: 10,
+    fontSize: 8,
     color: colors.textMuted,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 6,
+    letterSpacing: 1,
   },
   // Horizontal separator
   yachtSeparatorLine: {
@@ -1272,7 +1273,7 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
 
                   {/* Details Section with Two Columns */}
                   <View style={styles.yachtDetailsSection}>
-                    {/* Left Column - Details and Price */}
+                    {/* Left Column - Details */}
                     <View style={styles.yachtDetailsLeft}>
                       <View style={styles.yachtDetailItem}>
                         <Text style={styles.yachtDetailLabel}>ROUTE</Text>
@@ -1294,19 +1295,19 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
                           ))}
                         </View>
                       </View>
-
-                      {/* Price in Left Column */}
-                      <View style={styles.yachtPriceSection}>
-                        <Text style={styles.yachtPriceAmount}>{formatCurrency(serviceItem.price)}</Text>
-                        <Text style={styles.yachtPriceLabel}>PRICE</Text>
-                      </View>
                     </View>
 
-                    {/* Right Column - Secondary Image and Additional Text */}
+                    {/* Right Column - Secondary Image and Price */}
                     <View style={styles.yachtDetailsRight}>
                       {displayImages[1] && (
                         <Image src={displayImages[1]} style={styles.yachtSecondaryImage} />
                       )}
+
+                      {/* Price Below Image */}
+                      <View style={styles.yachtPriceSection}>
+                        <Text style={styles.yachtPriceAmount}>{formatCurrency(serviceItem.price)}</Text>
+                        <Text style={styles.yachtPriceLabel}>PRICE</Text>
+                      </View>
                     </View>
                   </View>
 

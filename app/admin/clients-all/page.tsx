@@ -1,7 +1,15 @@
 import { getAllClientsSystem, getCurrentManagerProfile, getAllClients } from '@/lib/actions/clients'
 import { AllClientsList } from '@/components/all-clients-list'
+import { isSuperAdmin } from '@/lib/auth/roles'
+import { redirect } from 'next/navigation'
 
 export default async function AllClientsPage() {
+  // Check if user is super admin
+  const isSuper = await isSuperAdmin()
+  if (!isSuper) {
+    redirect('/admin/clients') // Redirect to their regular clients page
+  }
+
   const [allClientsResult, managerResult, myClientsResult] = await Promise.all([
     getAllClientsSystem(),
     getCurrentManagerProfile(),

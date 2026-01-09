@@ -23,16 +23,14 @@ import {
   XCircle,
   Loader2,
   Edit,
-  UserCircle,
-  UserPlus,
-  UserMinus,
-  Check
+  UserCircle
 } from 'lucide-react'
 import Link from 'next/link'
-import { ClientWithDetails, ClientStatus, updateClientStatus, addClientToMyList, removeClientFromMyList } from '@/lib/actions/clients'
+import { ClientWithDetails, ClientStatus, updateClientStatus } from '@/lib/actions/clients'
 import { formatDistanceToNow } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { AssignAdminsDialog } from './assign-admins-dialog'
 
 type Props = {
   clients: ClientWithDetails[]
@@ -64,52 +62,10 @@ export function AllClientsList({ clients, currentManagerId, myClientIds = new Se
   const [statusFilter, setStatusFilter] = useState<ClientStatus | 'all'>('all')
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [mounted, setMounted] = useState(false)
-  const [addingClientId, setAddingClientId] = useState<string | null>(null)
-  const [removingClientId, setRemovingClientId] = useState<string | null>(null)
-  const [localMyClientIds, setLocalMyClientIds] = useState<Set<string>>(myClientIds)
 
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  useEffect(() => {
-    setLocalMyClientIds(myClientIds)
-  }, [myClientIds])
-
-  const handleAddToMyClients = async (clientId: string) => {
-    setAddingClientId(clientId)
-    const result = await addClientToMyList(clientId)
-
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success('Client added to your list')
-      setLocalMyClientIds(prev => new Set([...prev, clientId]))
-      router.refresh()
-    }
-    setAddingClientId(null)
-  }
-
-  const handleRemoveFromMyClients = async (clientId: string) => {
-    setRemovingClientId(clientId)
-    const result = await removeClientFromMyList(clientId)
-
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success('Client removed from your list')
-      setLocalMyClientIds(prev => {
-        const newSet = new Set(prev)
-        newSet.delete(clientId)
-        return newSet
-      })
-      router.refresh()
-    }
-    setRemovingClientId(null)
-  }
-
-  const isInMyList = (clientId: string) => localMyClientIds.has(clientId)
-  const isOwnedByMe = (client: ClientWithDetails) => client.property_managers?.id === currentManagerId
 
   // Get unique managers from clients
   const managers = useMemo(() => {
@@ -308,46 +264,12 @@ export function AllClientsList({ clients, currentManagerId, myClientIds = new Se
 
                     {/* Mobile Actions - Outside clickable area */}
                     <div className="flex flex-col gap-2 pt-2 border-t border-white/10">
-                      {/* Add to My List button for mobile */}
-                      {!isInMyList(client.id) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full h-8 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                          onClick={() => handleAddToMyClients(client.id)}
-                          disabled={addingClientId === client.id}
-                        >
-                          {addingClientId === client.id ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <UserPlus className="h-3 w-3 mr-1" />
-                          )}
-                          Add to My Clients
-                        </Button>
-                      )}
-                      {isInMyList(client.id) && (
-                        <div className="flex justify-center gap-2">
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 border text-xs px-2 py-1">
-                            <Check className="h-3 w-3 mr-1" />
-                            In My List
-                          </Badge>
-                          {!isOwnedByMe(client) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-6 text-[10px] border-red-500/30 text-red-400 hover:bg-red-500/10 px-2"
-                              onClick={() => handleRemoveFromMyClients(client.id)}
-                              disabled={removingClientId === client.id}
-                            >
-                              {removingClientId === client.id ? (
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                              ) : (
-                                <UserMinus className="h-3 w-3" />
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      )}
+                      {/* Assign Admins button for mobile */}
+                      <AssignAdminsDialog
+                        clientId={client.id}
+                        clientName={client.name}
+                        currentAssignments={client.shared_with_manager_ids || []}
+                      />
 
                       <div className="flex items-center gap-1.5">
                         <Select
@@ -435,48 +357,12 @@ export function AllClientsList({ clients, currentManagerId, myClientIds = new Se
 
                     {/* Desktop Actions */}
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      {/* Add to My Clients button */}
-                      {isInMyList(client.id) ? (
-                        <div className="flex items-center gap-2">
-                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 border text-xs px-2 py-1">
-                            <Check className="h-3 w-3 mr-1" />
-                            In My List
-                          </Badge>
-                          {!isOwnedByMe(client) && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10"
-                              onClick={() => handleRemoveFromMyClients(client.id)}
-                              disabled={removingClientId === client.id}
-                              title="Remove from My List"
-                            >
-                              {removingClientId === client.id ? (
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              ) : (
-                                <UserMinus className="h-3 w-3 mr-1" />
-                              )}
-                              Remove
-                            </Button>
-                          )}
-                        </div>
-                      ) : (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10"
-                          onClick={() => handleAddToMyClients(client.id)}
-                          disabled={addingClientId === client.id}
-                          title="Add to My Clients"
-                        >
-                          {addingClientId === client.id ? (
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                          ) : (
-                            <UserPlus className="h-3 w-3 mr-1" />
-                          )}
-                          Add to My List
-                        </Button>
-                      )}
+                      {/* Assign Admins button */}
+                      <AssignAdminsDialog
+                        clientId={client.id}
+                        clientName={client.name}
+                        currentAssignments={client.shared_with_manager_ids || []}
+                      />
 
                       <Select
                         value={client.status || 'active'}

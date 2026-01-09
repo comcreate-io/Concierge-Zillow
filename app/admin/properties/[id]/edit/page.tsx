@@ -138,7 +138,7 @@ export default function EditPropertyPage() {
       // Load all property managers
       const { data: managers } = await supabase
         .from('property_managers')
-        .select('id, name, email')
+        .select('id, name, last_name, email')
         .order('name')
 
       if (managers) {

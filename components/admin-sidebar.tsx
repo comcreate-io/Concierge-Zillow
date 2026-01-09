@@ -8,7 +8,7 @@ import Link from 'next/link'
 import { Home, LogOut, Building2, UserCheck, User as UserIcon, FileText, Sparkles, Users, Contact } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export function AdminSidebar({ user }: { user: User }) {
+export function AdminSidebar({ user, isSuperAdmin = false }: { user: User; isSuperAdmin?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
   const supabase = createClient()
@@ -19,7 +19,7 @@ export function AdminSidebar({ user }: { user: User }) {
     router.refresh()
   }
 
-  const navItems = [
+  const allNavItems = [
     {
       label: 'Profile',
       href: '/admin/profile',
@@ -36,7 +36,8 @@ export function AdminSidebar({ user }: { user: User }) {
       label: 'All Clients',
       href: '/admin/clients-all',
       icon: Users,
-      active: pathname === '/admin/clients-all' || pathname.startsWith('/admin/client/')
+      active: pathname === '/admin/clients-all' || pathname.startsWith('/admin/client/'),
+      superAdminOnly: true
     },
     {
       label: 'Properties',
@@ -63,6 +64,14 @@ export function AdminSidebar({ user }: { user: User }) {
       active: pathname === '/admin/quotes' || pathname.startsWith('/admin/quotes/')
     }
   ]
+
+  // Filter nav items based on role
+  const navItems = allNavItems.filter(item => {
+    if (item.superAdminOnly) {
+      return isSuperAdmin
+    }
+    return true
+  })
 
   return (
     <div className="hidden md:flex md:flex-col w-64 h-screen border-r border-white/10 backdrop-blur-md bg-black/40 shadow-xl sticky top-0">

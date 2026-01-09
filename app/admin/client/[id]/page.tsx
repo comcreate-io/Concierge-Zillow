@@ -12,6 +12,7 @@ import { formatPhoneNumber } from '@/lib/utils'
 import { ClientUrlDisplay } from '@/components/client-url-display'
 import { getInvoicesByClient } from '@/lib/actions/invoices'
 import { getQuotesByClient } from '@/lib/actions/quotes'
+import { isSuperAdmin } from '@/lib/auth/roles'
 
 export default async function AdminClientPage({
   params,
@@ -20,6 +21,9 @@ export default async function AdminClientPage({
 }) {
   const { id } = await params
   const supabase = await createClient()
+
+  // Check if current user is super admin
+  const isSuper = await isSuperAdmin()
 
   // Fetch client with their manager
   const { data: client, error: clientError } = await supabase
