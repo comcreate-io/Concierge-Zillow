@@ -105,22 +105,33 @@ export default function PropertyListingPage() {
         if (clientId) {
           const supabase = createClient()
 
-          // First fetch client and assignment
-          const [assignmentResult, clientResult] = await Promise.all([
-            supabase
-              .from('client_property_assignments')
-              .select('show_monthly_rent_to_client, show_nightly_rate_to_client, show_purchase_price_to_client')
-              .eq('client_id', clientId)
-              .eq('property_id', propertyId)
-              .single(),
-            supabase
-              .from('clients')
-              .select('manager_id')
-              .eq('id', clientId)
-              .single()
-          ])
+          // Check if clientId is a UUID or a slug
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clientId)
 
-          const assignment = assignmentResult.data
+          // Fetch client first (support both UUID and slug)
+          const clientQuery = supabase
+            .from('clients')
+            .select('id, manager_id')
+
+          if (isUUID) {
+            clientQuery.eq('id', clientId)
+          } else {
+            clientQuery.eq('slug', clientId)
+          }
+
+          const { data: clientData } = await clientQuery.single()
+
+          // Get the actual client UUID for assignment lookup
+          const actualClientId = clientData?.id || clientId
+
+          // Now fetch assignment using actual client UUID
+          const { data: assignment } = await supabase
+            .from('client_property_assignments')
+            .select('show_monthly_rent_to_client, show_nightly_rate_to_client, show_purchase_price_to_client')
+            .eq('client_id', actualClientId)
+            .eq('property_id', propertyId)
+            .single()
+
           if (assignment) {
             // Only show pricing if both the property has it enabled AND the client assignment allows it
             showMonthlyRent = showMonthlyRent && (assignment.show_monthly_rent_to_client ?? true)
@@ -129,11 +140,11 @@ export default function PropertyListingPage() {
           }
 
           // Fetch manager separately using manager_id
-          if (clientResult.data?.manager_id) {
+          if (clientData?.manager_id) {
             const { data: managerData } = await supabase
               .from('property_managers')
               .select('id, name, last_name, title, email, phone, profile_picture_url, instagram_url, facebook_url, linkedin_url, twitter_url')
-              .eq('id', clientResult.data.manager_id)
+              .eq('id', clientData.manager_id)
               .single()
 
             if (managerData) {
@@ -273,254 +284,207 @@ export default function PropertyListingPage() {
 
   return (
     <div className="min-h-screen marble-bg">
-      {/* Header */}
-      <header className="border-b border-white/20 backdrop-blur-md sticky top-0 z-50 glass-card-accent">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2 sm:py-3">
-          <div className="flex items-center justify-between gap-4">
-            <Link href={clientId ? `/client/${clientId}` : '/'} className="flex items-center gap-3 sm:gap-4 hover:opacity-80 transition-opacity flex-1 min-w-0">
-              <div className="shimmer">
+      {/* Elegant Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-2xl bg-gradient-to-b from-black/70 via-black/50 to-black/40 border-b border-white/[0.06]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            {/* Brand Section */}
+            <Link href={clientId ? `/client/${clientId}` : '/'} className="flex items-center gap-2.5 sm:gap-3 group">
+              <div className="scale-[0.6] sm:scale-75 flex-shrink-0 -ml-2 sm:-ml-1 transition-transform group-hover:scale-[0.62] sm:group-hover:scale-[0.77]">
                 <Logo />
               </div>
-              <div className="flex flex-col min-w-0">
-                <div className="luxury-heading text-base sm:text-lg md:text-xl tracking-widest text-white truncate">
-                  LUXURY LIVING
-                </div>
-                <div className="text-[10px] sm:text-xs tracking-[0.2em] text-white/70 uppercase font-semibold">
-                  Cadiz & Lluis
-                </div>
+              <div className="h-6 sm:h-8 w-px bg-gradient-to-b from-transparent via-white/20 to-transparent" />
+              <div className="flex flex-col">
+                <span className="text-[9px] sm:text-[11px] tracking-[0.15em] sm:tracking-[0.2em] text-white/80 font-light">
+                  LUXURY CONCIERGE
+                </span>
+                <span className="text-[7px] sm:text-[9px] tracking-[0.1em] text-white/40 font-light">
+                  CADIZ & LLUIS
+                </span>
               </div>
             </Link>
-            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              <Button
-                variant="outline"
-                size="sm"
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <Link href={clientId ? `/client/${clientId}` : '/'}>
+                <button className="flex items-center justify-center h-9 w-9 sm:h-9 sm:w-auto sm:px-4 rounded-full sm:rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.12] active:bg-white/[0.08] transition-all duration-200">
+                  <ChevronLeft className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                  <span className="hidden sm:inline ml-1 text-[11px] tracking-wide font-light">Back</span>
+                </button>
+              </Link>
+              <button
                 onClick={handleShare}
-                className="bg-white/10 text-white border-white/20 hover:bg-white/20 backdrop-blur-sm text-xs"
+                className="flex items-center justify-center h-9 w-9 sm:h-9 sm:w-auto sm:px-4 rounded-full sm:rounded-lg border border-white/[0.08] bg-white/[0.03] text-white/60 hover:text-white hover:bg-white/[0.06] hover:border-white/[0.12] active:bg-white/[0.08] transition-all duration-200"
               >
-                <Share2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="luxury-heading tracking-wider text-xs hidden sm:inline">Share</span>
-              </Button>
+                <Share2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline ml-1 text-[11px] tracking-wide font-light">Share</span>
+              </button>
             </div>
           </div>
         </div>
+        {/* Subtle bottom glow line */}
+        <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-        {/* Back Button */}
-        <div className="mb-6">
-          <Link href={clientId ? `/client/${clientId}` : '/'}>
-            <Button variant="ghost" className="text-white/70 hover:text-white hover:bg-white/10 backdrop-blur-sm -ml-2">
-              <ChevronLeft className="h-4 w-4 mr-1" />
-              Back to Properties
-            </Button>
-          </Link>
-        </div>
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-10">
 
-        {/* Property Header */}
-        <div className="mb-8 sm:mb-10">
-          <div className="glass-card-accent elevated-card rounded-2xl p-6 sm:p-8 md:p-10 border border-white/20">
-            <div className="flex flex-col lg:flex-row items-start justify-between gap-6 lg:gap-8 mb-8">
-              <div className="flex-1 min-w-0">
-                <Badge className="badge-accent mb-4">Featured Property</Badge>
-                {property.show_address !== false ? (
-                  <>
-                    <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white mb-4 break-words tracking-wide">
-                      {property.address}
-                    </h1>
-                    <div className="flex items-start gap-2 text-white/70 text-base sm:text-lg">
-                      <MapPin className="h-5 w-5 flex-shrink-0 mt-1" />
-                      <span className="break-words">{property.address}</span>
-                    </div>
-                  </>
-                ) : (
-                  <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-white mb-4 break-words tracking-wide">
-                    Luxury Property
-                  </h1>
+        {/* Hero Section - Address & Price */}
+        <div className="mb-4 sm:mb-10 animate-fade-in">
+          <div className="text-center mb-4 sm:mb-8">
+            {property.show_address !== false ? (
+              <h1 className="text-lg sm:text-3xl md:text-4xl font-extralight text-white tracking-[0.03em] sm:tracking-[0.1em] mb-2 leading-snug">
+                {property.address}
+              </h1>
+            ) : (
+              <h1 className="text-lg sm:text-3xl md:text-4xl font-extralight text-white tracking-[0.03em] sm:tracking-[0.1em] mb-2">
+                Luxury Property
+              </h1>
+            )}
+
+            {/* Pricing inline */}
+            {(property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price) && (
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-6 mt-3 sm:mt-4">
+                {property.show_monthly_rent && property.custom_monthly_rent && (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg sm:text-2xl md:text-3xl font-light text-white">
+                      {formatCurrency(property.custom_monthly_rent)}
+                    </span>
+                    <span className="text-[9px] sm:text-xs text-white/50 uppercase tracking-wider">/mo</span>
+                  </div>
+                )}
+                {property.show_nightly_rate && property.custom_nightly_rate && (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg sm:text-2xl md:text-3xl font-light text-white">
+                      {formatCurrency(property.custom_nightly_rate)}
+                    </span>
+                    <span className="text-[9px] sm:text-xs text-white/50 uppercase tracking-wider">/night</span>
+                  </div>
+                )}
+                {property.show_purchase_price && property.custom_purchase_price && (
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg sm:text-2xl md:text-3xl font-light text-white">
+                      {formatCurrency(property.custom_purchase_price)}
+                    </span>
+                  </div>
                 )}
               </div>
-              {/* Pricing Display */}
-              {(property.show_monthly_rent || property.show_nightly_rate || property.show_purchase_price) && (() => {
-                // Count how many prices are shown
-                const priceCount = [
-                  property.show_monthly_rent && property.custom_monthly_rent,
-                  property.show_nightly_rate && property.custom_nightly_rate,
-                  property.show_purchase_price && property.custom_purchase_price
-                ].filter(Boolean).length;
-
-                // Adjust font size based on price count
-                const priceSize = priceCount === 1
-                  ? "text-4xl sm:text-5xl md:text-6xl"
-                  : priceCount === 2
-                    ? "text-2xl sm:text-3xl md:text-4xl"
-                    : "text-xl sm:text-2xl md:text-3xl";
-                const labelSize = priceCount === 1 ? "text-sm" : "text-xs";
-                const spacing = priceCount === 1 ? "space-y-4" : "space-y-3";
-
-                return (
-                  <div className="text-left lg:text-right w-full lg:w-auto">
-                    <div className="relative">
-                      {/* Glow effect */}
-                      <div className="absolute inset-0 bg-white/10 blur-2xl rounded-full"></div>
-                      {/* Prices */}
-                      <div className={`relative ${spacing}`}>
-                        {property.show_monthly_rent && property.custom_monthly_rent && (
-                          <div>
-                            <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
-                              {formatCurrency(property.custom_monthly_rent)}
-                            </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
-                              {property.label_monthly_rent || 'Per Month'}
-                            </div>
-                          </div>
-                        )}
-                        {property.show_nightly_rate && property.custom_nightly_rate && (
-                          <div>
-                            <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
-                              {formatCurrency(property.custom_nightly_rate)}
-                            </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
-                              {property.label_nightly_rate || 'Per Night'}
-                            </div>
-                            <div className="text-[10px] text-white/50 italic">not including taxes</div>
-                          </div>
-                        )}
-                        {property.show_purchase_price && property.custom_purchase_price && (
-                          <div>
-                            <div className={`${priceSize} luxury-heading text-white mb-1 tracking-wide`}>
-                              {formatCurrency(property.custom_purchase_price)}
-                            </div>
-                            <div className={`${labelSize} text-white/70 uppercase tracking-[0.3em] font-semibold`}>
-                              {property.label_purchase_price || 'Purchase Price'}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-
-            {/* Decorative divider */}
-            <div className="flex items-center justify-center gap-4 mb-8">
-              <div className="h-px flex-1 divider-accent"></div>
-              <div className="w-2 h-2 rounded-full bg-white/60"></div>
-              <div className="h-px flex-1 divider-accent"></div>
-            </div>
-
-            {/* Property Stats - respect visibility settings */}
-            {(() => {
-              const visibleStats = [
-                property.show_bedrooms !== false,
-                property.show_bathrooms !== false,
-                property.show_area !== false
-              ].filter(Boolean).length
-
-              if (visibleStats === 0) return null
-
-              const gridCols = visibleStats === 3 ? 'sm:grid-cols-3' : visibleStats === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1'
-
-              return (
-                <div className={`grid grid-cols-1 ${gridCols} gap-4 sm:gap-6`}>
-                  {property.show_bedrooms !== false && (
-                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                      <div className="flex items-center gap-4 p-5 sm:p-6">
-                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                          <Bed className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bedrooms)}</div>
-                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_bedrooms || 'Bedrooms'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {property.show_bathrooms !== false && (
-                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                      <div className="flex items-center gap-4 p-5 sm:p-6">
-                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                          <Bath className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.bathrooms)}</div>
-                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_bathrooms || 'Bathrooms'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {property.show_area !== false && (
-                    <div className="glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                      <div className="flex items-center gap-4 p-5 sm:p-6">
-                        <div className="p-3 bg-white/10 rounded-full flex-shrink-0">
-                          <Square className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-3xl sm:text-4xl font-bold text-white mb-1">{formatPropertyValue(property.area, formatNumber)}</div>
-                          <div className="text-xs text-white/70 uppercase tracking-[0.2em] font-semibold">{property.label_area || 'Square Feet'}</div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })()}
+            )}
           </div>
+
+          {/* Property Stats - Compact on mobile */}
+          {(() => {
+            const showBedrooms = property.show_bedrooms !== false
+            const showBathrooms = property.show_bathrooms !== false
+            const showArea = property.show_area !== false
+            const visibleStats = [showBedrooms, showBathrooms, showArea].filter(Boolean).length
+
+            if (visibleStats === 0) return null
+
+            return (
+              <div className="flex items-center justify-center gap-3 sm:gap-8 py-3 sm:py-4 border-y border-white/[0.06]">
+                {showBedrooms && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Bed className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-white/40" />
+                    <span className="text-white text-xs sm:text-base font-light">{formatPropertyValue(property.bedrooms)}</span>
+                    <span className="text-white/40 text-[10px] sm:text-sm">{property.label_bedrooms || 'Beds'}</span>
+                  </div>
+                )}
+                {showBedrooms && (showBathrooms || showArea) && (
+                  <span className="w-px h-3 sm:h-4 bg-white/10" />
+                )}
+                {showBathrooms && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Bath className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-white/40" />
+                    <span className="text-white text-xs sm:text-base font-light">{formatPropertyValue(property.bathrooms)}</span>
+                    <span className="text-white/40 text-[10px] sm:text-sm">{property.label_bathrooms || 'Baths'}</span>
+                  </div>
+                )}
+                {showBathrooms && showArea && (
+                  <span className="w-px h-3 sm:h-4 bg-white/10" />
+                )}
+                {showArea && (
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Square className="h-3.5 w-3.5 sm:h-5 sm:w-5 text-white/40" />
+                    <span className="text-white text-xs sm:text-base font-light">{formatPropertyValue(property.area, formatNumber)}</span>
+                    <span className="text-white/40 text-[10px] sm:text-sm">{property.label_area || 'Sq Ft'}</span>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
-        {/* Property Images Gallery - respect show_images */}
+        {/* Property Images Gallery */}
         {property.show_images !== false && property.images.length > 0 && (
-          <div className="mb-8 sm:mb-10">
-            <Card className="glass-card-accent elevated-card border border-white/20 overflow-hidden p-0">
+          <div className="mb-6 sm:mb-12 animate-fade-in">
+            <div className="rounded-xl sm:rounded-2xl overflow-hidden border border-white/[0.06] bg-black/20">
               <div className="relative group/gallery">
-                <div className="aspect-[16/10] bg-background/40 marble-bg relative overflow-hidden">
+                {/* Main Image */}
+                <div className="aspect-[4/3] sm:aspect-[16/9] relative overflow-hidden">
                   <img
                     src={property.images[currentImageIndex]}
                     alt={`${property.address} - Image ${currentImageIndex + 1}`}
-                    className="w-full h-full object-cover transition-opacity duration-500"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none'
                     }}
                   />
+                  {/* Subtle gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
 
-                  {/* Navigation Arrows */}
+                  {/* Navigation Arrows - Larger touch targets on mobile */}
                   {property.images.length > 1 && (
                     <>
                       <button
                         onClick={prevImage}
-                        className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 transition-all z-10 sm:opacity-0 sm:group-hover/gallery:opacity-100"
+                        className="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 bg-black/50 active:bg-black/70 backdrop-blur-sm text-white rounded-full p-3 sm:p-3 transition-all z-10 border border-white/10"
                       >
                         <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
                       <button
                         onClick={nextImage}
-                        className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/70 text-white rounded-full p-2 sm:p-3 transition-all z-10 sm:opacity-0 sm:group-hover/gallery:opacity-100"
+                        className="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 bg-black/50 active:bg-black/70 backdrop-blur-sm text-white rounded-full p-3 sm:p-3 transition-all z-10 border border-white/10"
                       >
                         <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
                       </button>
                     </>
                   )}
 
-                  {/* Image Counter */}
+                  {/* Image indicator dots */}
                   {property.images.length > 1 && (
-                    <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md text-white px-4 py-2 rounded-lg text-sm font-semibold border border-white/20">
-                      {currentImageIndex + 1} / {property.images.length}
+                    <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 sm:gap-2">
+                      {property.images.slice(0, 5).map((_, index) => (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentImageIndex(index)}
+                          className={`h-2 rounded-full transition-all duration-300 ${
+                            index === currentImageIndex
+                              ? 'bg-white w-5 sm:w-6'
+                              : 'bg-white/50 active:bg-white/80 w-2'
+                          }`}
+                          aria-label={`Go to image ${index + 1}`}
+                        />
+                      ))}
+                      {property.images.length > 5 && (
+                        <span className="text-white/60 text-[10px] sm:text-xs ml-1">+{property.images.length - 5}</span>
+                      )}
                     </div>
                   )}
                 </div>
 
-                {/* Thumbnail Navigation */}
+                {/* Thumbnail Strip - Hidden on mobile for cleaner look */}
                 {property.images.length > 1 && (
-                  <div className="p-4 sm:p-6 bg-background/20 border-t border-white/10">
-                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                  <div className="hidden sm:block p-3 sm:p-4 bg-black/30 border-t border-white/[0.06]">
+                    <div className="flex gap-2 sm:gap-3 overflow-x-auto pb-1">
                       {property.images.map((image, index) => (
                         <button
                           key={index}
                           onClick={() => setCurrentImageIndex(index)}
-                          className={`flex-shrink-0 w-20 h-14 sm:w-24 sm:h-16 rounded-lg border-2 transition-all duration-300 transform hover:scale-110 overflow-hidden ${
+                          className={`flex-shrink-0 w-16 h-12 sm:w-20 sm:h-14 rounded-lg overflow-hidden transition-all duration-300 ${
                             index === currentImageIndex
-                              ? 'border-white shadow-lg scale-110'
-                              : 'border-white/30 hover:border-white/60'
+                              ? 'ring-2 ring-white ring-offset-1 ring-offset-black/50 opacity-100'
+                              : 'opacity-50 hover:opacity-80'
                           }`}
                         >
                           <img
@@ -534,250 +498,146 @@ export default function PropertyListingPage() {
                   </div>
                 )}
               </div>
-            </Card>
+            </div>
           </div>
         )}
 
-        {/* Property Description */}
-        {property.description && (
-          <div className="mb-8 sm:mb-10">
-            <Card className="glass-card-accent elevated-card border border-white/20">
-              <CardContent className="p-6 sm:p-8 md:p-10">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-1 w-12 divider-accent"></div>
-                  <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">About This Property</h2>
-                </div>
-                <div className="prose-property text-base sm:text-lg">
-                  <ReactMarkdown>
-                    {property.description}
-                  </ReactMarkdown>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Custom Notes from Admin */}
-        {property.custom_notes && (
-          <div className="mb-8 sm:mb-10">
-            <Card className="glass-card-accent elevated-card border border-blue-400/30 bg-blue-500/5">
-              <CardContent className="p-6 sm:p-8 md:p-10">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-1 w-12 bg-gradient-to-r from-blue-400 to-purple-500"></div>
-                  <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Important Information</h2>
-                </div>
-                <div className="prose-property text-base sm:text-lg text-white/90 whitespace-pre-wrap">
-                  {property.custom_notes}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Property Details */}
-        <div className="mb-8 sm:mb-10">
-          <Card className="glass-card-accent elevated-card border border-white/20">
-            <CardContent className="p-6 sm:p-8 md:p-10">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-1 w-12 divider-accent"></div>
-                <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Property Details</h2>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {property.show_address !== false && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">Address</span>
-                    <span className="font-bold text-white text-right ml-4">{property.address}</span>
-                  </div>
-                )}
-                {property.show_bedrooms !== false && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_bedrooms || 'Bedrooms'}</span>
-                    <span className="font-bold text-white text-lg">{formatPropertyValue(property.bedrooms)}</span>
-                  </div>
-                )}
-                {property.show_bathrooms !== false && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_bathrooms || 'Bathrooms'}</span>
-                    <span className="font-bold text-white text-lg">{formatPropertyValue(property.bathrooms)}</span>
-                  </div>
-                )}
-                {property.show_area !== false && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_area || 'Area'}</span>
-                    <span className="font-bold text-white text-lg">{isValidPropertyValue(property.area) ? `${formatNumber(property.area)} sq ft` : '—'}</span>
-                  </div>
-                )}
-                {/* Pricing Details */}
-                {property.show_monthly_rent && property.custom_monthly_rent && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_monthly_rent || 'Monthly Rent'}</span>
-                    <span className="font-bold text-white text-lg">{formatCurrency(property.custom_monthly_rent)}</span>
-                  </div>
-                )}
-                {property.show_nightly_rate && property.custom_nightly_rate && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_nightly_rate || 'Nightly Rate'}</span>
-                    <div className="text-right">
-                      <span className="font-bold text-white text-lg">{formatCurrency(property.custom_nightly_rate)}</span>
-                      <div className="text-xs text-white/50 italic">not including taxes</div>
-                    </div>
-                  </div>
-                )}
-                {property.show_purchase_price && property.custom_purchase_price && (
-                  <div className="flex justify-between items-center p-5 glass-card-accent rounded-xl border border-white/20 hover:scale-105 transition-transform duration-300">
-                    <span className="text-white/70 font-semibold uppercase tracking-wider text-sm">{property.label_purchase_price || 'Purchase Price'}</span>
-                    <span className="font-bold text-white text-lg">{formatCurrency(property.custom_purchase_price)}</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Location Map */}
-        <div className="mb-8 sm:mb-10">
-          <Card className="glass-card-accent elevated-card border border-white/20">
-            <CardContent className="p-6 sm:p-8 md:p-10">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="h-1 w-12 divider-accent"></div>
-                <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Location</h2>
-              </div>
-              <div className="rounded-xl overflow-hidden border border-white/20">
-                <iframe
-                  width="100%"
-                  height="450"
-                  style={{ border: 0 }}
-                  loading="lazy"
-                  allowFullScreen
-                  referrerPolicy="no-referrer-when-downgrade"
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(property.address)}&output=embed`}
-                  className="w-full"
-                ></iframe>
-              </div>
-              <div className="mt-4 flex items-start gap-2 text-white/70 text-sm">
-                <MapPin className="h-5 w-5 flex-shrink-0 mt-0.5" />
-                <span>{property.address}</span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Contact Section */}
+        {/* Contact Section - Moved up for visibility */}
         {property.managers && property.managers.length > 0 && (() => {
           const manager = property.managers[0]
           const fullName = manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name
           const hasSocialLinks = manager.instagram_url || manager.facebook_url || manager.linkedin_url || manager.twitter_url
 
           return (
-            <div className="mb-8 sm:mb-10">
-              <Card className="glass-card-accent elevated-card border border-white/20">
-                <CardContent className="p-6 sm:p-8 md:p-10">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="h-1 w-12 divider-accent"></div>
-                    <h2 className="luxury-heading text-2xl sm:text-3xl text-white tracking-wide">Your Agent</h2>
+            <div className="mb-6 sm:mb-12 animate-fade-in">
+              <div className="rounded-lg sm:rounded-xl border border-white/[0.06] bg-black/20 p-4 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-5">
+                  {/* Profile Picture */}
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-white/[0.05] border border-white/[0.08] flex items-center justify-center flex-shrink-0">
+                    {manager.profile_picture_url ? (
+                      <img
+                        src={manager.profile_picture_url}
+                        alt={fullName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="h-6 w-6 sm:h-8 sm:w-8 text-white/30" />
+                    )}
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 sm:gap-8">
-                    {/* Profile Picture */}
-                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden bg-white/10 border-2 border-white/30 flex items-center justify-center flex-shrink-0">
-                      {manager.profile_picture_url ? (
-                        <img
-                          src={manager.profile_picture_url}
-                          alt={fullName}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="h-12 w-12 text-white/40" />
-                      )}
-                    </div>
-
-                    {/* Contact Info */}
-                    <div className="flex-1 text-center sm:text-left">
-                      <h3 className="text-xl sm:text-2xl font-bold text-white tracking-wide mb-1">
-                        {fullName}
-                      </h3>
-                      {manager.title && (
-                        <p className="text-white/60 text-sm mb-4">{manager.title}</p>
-                      )}
-
-                      {/* Contact Links */}
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-6 mb-4">
-                        {manager.email && (
-                          <a
-                            href={`mailto:${manager.email}`}
-                            className="flex items-center justify-center sm:justify-start gap-2 text-white/80 hover:text-white transition-colors"
-                          >
-                            <Mail className="h-4 w-4" />
-                            <span className="text-sm">{manager.email}</span>
-                          </a>
-                        )}
-                        {manager.phone && (
-                          <a
-                            href={`tel:${manager.phone}`}
-                            className="flex items-center justify-center sm:justify-start gap-2 text-white/80 hover:text-white transition-colors"
-                          >
-                            <Phone className="h-4 w-4" />
-                            <span className="text-sm">{formatPhoneNumber(manager.phone)}</span>
-                          </a>
-                        )}
-                      </div>
-
-                      {/* Social Media Links */}
-                      {hasSocialLinks && (
-                        <div className="flex items-center justify-center sm:justify-start gap-4">
-                          {manager.instagram_url && (
-                            <a
-                              href={manager.instagram_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
-                              aria-label="Instagram"
-                            >
-                              <Instagram className="h-4 w-4" />
-                            </a>
-                          )}
-                          {manager.facebook_url && (
-                            <a
-                              href={manager.facebook_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
-                              aria-label="Facebook"
-                            >
-                              <Facebook className="h-4 w-4" />
-                            </a>
-                          )}
-                          {manager.linkedin_url && (
-                            <a
-                              href={manager.linkedin_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
-                              aria-label="LinkedIn"
-                            >
-                              <Linkedin className="h-4 w-4" />
-                            </a>
-                          )}
-                          {manager.twitter_url && (
-                            <a
-                              href={manager.twitter_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded-full bg-white/10 border border-white/20 text-white/60 hover:text-white hover:bg-white/20 transition-all"
-                              aria-label="Twitter"
-                            >
-                              <Twitter className="h-4 w-4" />
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                  {/* Contact Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white/40 text-[9px] sm:text-[10px] uppercase tracking-[0.15em] mb-0.5">Your Agent</p>
+                    <h3 className="text-sm sm:text-base font-light text-white tracking-wide truncate">
+                      {fullName}
+                    </h3>
+                    {manager.title && (
+                      <p className="text-white/40 text-[10px] sm:text-xs font-light truncate">{manager.title}</p>
+                    )}
                   </div>
-                </CardContent>
-              </Card>
+
+                  {/* Quick Contact Buttons */}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {manager.phone && (
+                      <a
+                        href={`tel:${manager.phone}`}
+                        className="p-2.5 sm:p-2 rounded-full border border-white/[0.08] bg-white/[0.03] text-white/60 active:text-white active:bg-white/[0.08] transition-all"
+                        aria-label="Call"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )}
+                    {manager.email && (
+                      <a
+                        href={`mailto:${manager.email}`}
+                        className="p-2.5 sm:p-2 rounded-full border border-white/[0.08] bg-white/[0.03] text-white/60 active:text-white active:bg-white/[0.08] transition-all"
+                        aria-label="Email"
+                      >
+                        <Mail className="h-4 w-4" />
+                      </a>
+                    )}
+                    {hasSocialLinks && manager.instagram_url && (
+                      <a
+                        href={manager.instagram_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2.5 sm:p-2 rounded-full border border-white/[0.08] bg-white/[0.03] text-white/60 active:text-white active:bg-white/[0.08] transition-all hidden sm:flex"
+                        aria-label="Instagram"
+                      >
+                        <Instagram className="h-4 w-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )
         })()}
+
+        {/* Property Description */}
+        {property.description && (
+          <div className="mb-6 sm:mb-12 animate-fade-in">
+            <div className="mb-3 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <span className="w-4 sm:w-10 h-px bg-gradient-to-r from-white/30 to-transparent" />
+                <h2 className="text-base sm:text-xl font-extralight text-white tracking-[0.08em] sm:tracking-[0.1em]">About This Property</h2>
+              </div>
+            </div>
+            <div className="rounded-lg sm:rounded-xl border border-white/[0.06] bg-black/20 p-4 sm:p-8">
+              <div className="prose-property text-[13px] sm:text-base font-light leading-relaxed">
+                <ReactMarkdown>
+                  {property.description}
+                </ReactMarkdown>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Custom Notes from Admin */}
+        {property.custom_notes && (
+          <div className="mb-6 sm:mb-12 animate-fade-in">
+            <div className="mb-3 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <span className="w-4 sm:w-10 h-px bg-gradient-to-r from-blue-400/50 to-transparent" />
+                <h2 className="text-base sm:text-xl font-extralight text-white tracking-[0.08em] sm:tracking-[0.1em]">Important Information</h2>
+              </div>
+            </div>
+            <div className="rounded-lg sm:rounded-xl border border-blue-400/20 bg-blue-500/5 p-4 sm:p-8">
+              <div className="text-[13px] sm:text-base text-white/90 font-light whitespace-pre-wrap leading-relaxed">
+                {property.custom_notes}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Location Map */}
+        {property.show_address !== false && (
+          <div className="mb-6 sm:mb-12 animate-fade-in">
+            <div className="mb-3 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <span className="w-4 sm:w-10 h-px bg-gradient-to-r from-white/30 to-transparent" />
+                <h2 className="text-base sm:text-xl font-extralight text-white tracking-[0.08em] sm:tracking-[0.1em]">Location</h2>
+              </div>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-white/[0.06]">
+              <iframe
+                width="100%"
+                height="250"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://www.google.com/maps?q=${encodeURIComponent(property.address)}&output=embed`}
+                className="w-full sm:h-[350px]"
+              ></iframe>
+            </div>
+            <div className="mt-2 sm:mt-3 flex items-center gap-2 text-white/50 text-[11px] sm:text-sm">
+              <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+              <span className="font-light truncate">{property.address}</span>
+            </div>
+          </div>
+        )}
+
       </main>
     </div>
   )
