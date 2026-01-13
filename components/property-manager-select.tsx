@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 export type PropertyManager = {
   id: string
   name: string
+  last_name?: string
   email: string
 }
 
@@ -49,7 +50,7 @@ export function PropertyManagerSelect({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 relative z-30">
       {/* Dropdown Button */}
       <div className="relative">
         <button
@@ -75,12 +76,12 @@ export function PropertyManagerSelect({
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 z-10"
+              className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
             />
 
             {/* Dropdown Content */}
-            <div className="absolute z-20 w-full mt-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl max-h-80 overflow-y-auto">
+            <div className="absolute z-50 w-full mt-2 bg-black/95 backdrop-blur-xl border border-white/20 rounded-lg shadow-2xl max-h-80 overflow-y-auto">
               <div className="p-2">
                 {managers.map((manager) => {
                   const isSelected = selectedManagerIds.includes(manager.id)
@@ -103,7 +104,7 @@ export function PropertyManagerSelect({
                       </div>
                       <div className="flex-1">
                         <div className="font-semibold text-white tracking-wide text-sm">
-                          {manager.name}
+                          {manager.name} {manager.last_name || ''}
                         </div>
                         <div className="text-xs text-white/60 tracking-wide">
                           {manager.email}
@@ -127,7 +128,7 @@ export function PropertyManagerSelect({
               variant="secondary"
               className="pl-4 pr-2 py-2 gap-2 bg-white/10 text-white border-white/20 hover:bg-white/15 transition-all"
             >
-              <span className="font-medium tracking-wide">{manager.name}</span>
+              <span className="font-medium tracking-wide">{manager.name} {manager.last_name || ''}</span>
               <button
                 type="button"
                 className="h-auto p-0.5 hover:bg-white/20 rounded transition-colors"

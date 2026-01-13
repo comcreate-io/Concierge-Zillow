@@ -40,6 +40,11 @@ export interface Property {
   label_purchase_price?: string
   // Custom notes
   custom_notes?: string | null
+  // Agent info (backend only)
+  agent_name?: string | null
+  agent_phone?: string | null
+  agent_email?: string | null
+  broker_name?: string | null
 }
 
 export async function getProperties() {
@@ -99,10 +104,10 @@ export async function getPropertyById(id: string) {
     return null
   }
 
-  // Fetch property managers
+  // Fetch property managers with all contact info and social links
   const { data: assignments } = await supabase
     .from('property_manager_assignments')
-    .select('manager_id, property_managers(id, name, email, phone, profile_picture_url)')
+    .select('manager_id, property_managers(id, name, last_name, title, email, phone, profile_picture_url, instagram_url, facebook_url, linkedin_url, twitter_url)')
     .eq('property_id', id)
 
   const managers = assignments?.map((a: any) => a.property_managers).filter(Boolean) || []
@@ -125,9 +130,12 @@ export async function saveProperty(propertyData: {
   custom_nightly_rate?: number | null
   show_purchase_price?: boolean
   custom_purchase_price?: number | null
+  // Agent info (backend only)
+  agent_name?: string | null
+  agent_phone?: string | null
+  agent_email?: string | null
+  broker_name?: string | null
 }) {
-  console.log('saveProperty called with:', propertyData)
-
   // Allow duplicate zillow_urls - different managers can add the same property with different pricing
   const { data, error } = await supabase
     .from('properties')
@@ -152,6 +160,5 @@ export async function saveProperty(propertyData: {
     throw new Error(error.message || 'Failed to save property')
   }
 
-  console.log('Property saved successfully:', data)
   return data as Property
 }

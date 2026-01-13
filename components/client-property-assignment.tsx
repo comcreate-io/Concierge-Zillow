@@ -27,11 +27,20 @@ import {
 } from '@/lib/actions/clients'
 import { createPropertyAndAssignToClient, NewPropertyData } from '@/lib/actions/properties'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, Upload, DollarSign, Link2, Edit3 } from 'lucide-react'
+import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import Link from 'next/link'
+import { ImageDropZone } from '@/components/image-drop-zone'
 import { saveProperty } from '@/lib/supabase'
 import { assignPropertyToManagers } from '@/lib/actions/properties'
 import { getCurrentManagerProfile } from '@/lib/actions/clients'
 import { formatCurrency, formatNumber } from '@/lib/utils'
+import { findOrCreateAgent, linkPropertyToAgent } from '@/lib/agents'
 
 type Property = {
   id: string
@@ -110,10 +119,23 @@ export function ClientPropertyAssignment({
     show_purchase_price: false,
   })
   const [manualDescription, setManualDescription] = useState('')
-  const [manualImageUrls, setManualImageUrls] = useState('')
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // No images prompt state (for scraping fallback)
+  const [showNoImagesPrompt, setShowNoImagesPrompt] = useState(false)
+  const [scrapedDataForFallback, setScrapedDataForFallback] = useState<{
+    address: string
+    bedrooms: string
+    bathrooms: string
+    area: string
+    description?: string
+    zillowUrl: string
+    scrapedPrice?: number | null
+    isRental?: boolean
+  } | null>(null)
+
+  
   useEffect(() => {
     setIsMounted(true)
     setAssignedProperties(initialAssignedProperties)
@@ -419,7 +441,6 @@ export function ClientPropertyAssignment({
     })
     setZillowUrl('')
     setManualDescription('')
-    setManualImageUrls('')
     setInputMode('scrape')
     setShowNewPropertyModal(true)
   }
@@ -438,6 +459,22 @@ export function ClientPropertyAssignment({
     setIsCreatingProperty(true)
 
     try {
+      // Check if URL is a building/complex page (not supported by API)
+      const urlLower = zillowUrl.toLowerCase()
+      const isBuildingUrl = urlLower.includes('/apartments/') ||
+                           urlLower.includes('/b/') ||
+                           (urlLower.includes('zillow.com') && !urlLower.includes('_zpid'))
+
+      if (isBuildingUrl) {
+        setIsCreatingProperty(false)
+        toast({
+          title: 'Building URL Detected',
+          description: 'This appears to be an apartment building page. Please use a specific unit URL (ending in _zpid) or switch to Manual mode to add this property.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       const apiKey = process.env.NEXT_PUBLIC_HASDATA_API_KEY
       if (!apiKey) {
         throw new Error('HasData API key is not configured')
@@ -473,14 +510,14 @@ export function ClientPropertyAssignment({
       const data = await response.json()
       const propertyData = data.property || data
 
-      // Extract address
+      // Extract address - prefer full address with city/state for proper categorization
       let address = ""
-      if (propertyData.addressRaw) {
-        address = propertyData.addressRaw
-      } else if (typeof propertyData.address === 'object' && propertyData.address) {
+      if (typeof propertyData.address === 'object' && propertyData.address) {
         const addr = propertyData.address
         const parts = [addr.street, addr.city, `${addr.state} ${addr.zipcode}`].filter(Boolean)
         address = parts.join(', ')
+      } else if (propertyData.addressRaw) {
+        address = propertyData.addressRaw
       } else if (typeof propertyData.address === 'string') {
         address = propertyData.address
       } else if (propertyData.fullAddress) {
@@ -528,6 +565,42 @@ export function ClientPropertyAssignment({
         area = (propertyData.livingArea || propertyData.area || "").toString()
       }
 
+      // Extract price from Zillow
+      let scrapedPrice: number | null = null
+      let isRental = false
+
+      // Check if it's a rental property (status can be "FOR_RENT", "FOR_SALE", etc.)
+      const propertyStatus = (propertyData.status || propertyData.homeStatus || '').toString().toUpperCase()
+
+      if (propertyStatus.includes('RENT') ||
+          propertyData.listingSubType?.toLowerCase().includes('rent') ||
+          urlLower.includes('/rental/')) {
+        isRental = true
+        // For rentals, get the rental price (price field contains monthly rent for rentals)
+        const rawPrice = propertyData.price || propertyData.rentZestimate || propertyData.rent || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
+      } else {
+        // For sale properties
+        const rawPrice = propertyData.price || propertyData.listPrice || propertyData.zestimate || null
+        if (typeof rawPrice === 'string') {
+          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
+        } else if (typeof rawPrice === 'number') {
+          scrapedPrice = rawPrice
+        }
+      }
+
+      // Extract agent info (backend only - not displayed to clients)
+      const agentName = propertyData.agentName || null
+      const agentPhone = propertyData.agentPhoneNumber || null
+      const agentEmail = Array.isArray(propertyData.agentEmails) && propertyData.agentEmails.length > 0
+        ? propertyData.agentEmails[0]
+        : null
+      const brokerName = propertyData.brokerName || null
+
       // Get images
       let zillowImageUrls: string[] = []
       const rawPhotos = propertyData.photos || propertyData.images || []
@@ -569,7 +642,25 @@ export function ClientPropertyAssignment({
         }
       }
 
-      // Save the property
+      // Check if no images were found - show prompt to add manually
+      if (cloudinaryImageUrls.length === 0) {
+        setScrapedDataForFallback({
+          address,
+          bedrooms,
+          bathrooms,
+          area,
+          description: propertyData.description || undefined,
+          zillowUrl: zillowUrl.trim(),
+          scrapedPrice,
+          isRental,
+        })
+        setShowNoImagesPrompt(true)
+        setIsCreatingProperty(false)
+        return
+      }
+
+      // Save the property with scraped price
+      // Use scraped price if available, otherwise use user-entered values
       const newProperty = {
         address,
         bedrooms,
@@ -578,15 +669,39 @@ export function ClientPropertyAssignment({
         zillow_url: zillowUrl.trim(),
         images: cloudinaryImageUrls,
         description: propertyData.description || null,
-        show_monthly_rent: newPropertyData.show_monthly_rent,
-        custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
+        // For rentals, set monthly rent from scraped price
+        show_monthly_rent: isRental && scrapedPrice ? true : newPropertyData.show_monthly_rent,
+        custom_monthly_rent: isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_monthly_rent || null),
         show_nightly_rate: newPropertyData.show_nightly_rate,
         custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
-        show_purchase_price: newPropertyData.show_purchase_price,
-        custom_purchase_price: newPropertyData.custom_purchase_price || null,
+        // For sales, set purchase price from scraped price
+        show_purchase_price: !isRental && scrapedPrice ? true : newPropertyData.show_purchase_price,
+        custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_purchase_price || null),
+        // Agent info (backend only)
+        agent_name: agentName,
+        agent_phone: agentPhone,
+        agent_email: agentEmail,
+        broker_name: brokerName,
       }
 
       const savedProperty = await saveProperty(newProperty)
+
+      // Create/find agent and link to property
+      if (savedProperty.id && agentName && agentPhone) {
+        try {
+          const agentId = await findOrCreateAgent({
+            name: agentName,
+            phone: agentPhone,
+            email: agentEmail,
+            broker_name: brokerName,
+          })
+          if (agentId) {
+            await linkPropertyToAgent(savedProperty.id, agentId)
+          }
+        } catch (agentError) {
+          console.warn('Failed to create/link agent:', agentError)
+        }
+      }
 
       // Get current manager and assign property
       const { data: managerProfile } = await getCurrentManagerProfile()
@@ -614,9 +729,9 @@ export function ClientPropertyAssignment({
         client_id: clientId,
         property_id: savedProperty.id,
         position: nextPosition,
-        show_monthly_rent_to_client: newPropertyData.show_monthly_rent ?? true,
+        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
         show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
-        show_purchase_price_to_client: newPropertyData.show_purchase_price ?? true,
+        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
       })
 
       // Generate AI description
@@ -638,7 +753,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property scraped and assigned to client',
+        description: 'Property scraped and added to client',
       })
       setShowNewPropertyModal(false)
       router.refresh()
@@ -716,6 +831,126 @@ export function ClientPropertyAssignment({
     }))
   }
 
+  // Handler for when user wants to add images manually after scraping found none
+  const handleAddImagesManually = () => {
+    if (!scrapedDataForFallback) return
+
+    // Switch to manual mode with pre-filled scraped data
+    setInputMode('manual')
+    setNewPropertyData(prev => ({
+      ...prev,
+      address: scrapedDataForFallback.address,
+      bedrooms: scrapedDataForFallback.bedrooms,
+      bathrooms: scrapedDataForFallback.bathrooms,
+      area: scrapedDataForFallback.area,
+      images: [],
+    }))
+    setManualDescription(scrapedDataForFallback.description || '')
+    setShowNoImagesPrompt(false)
+
+    toast({
+      title: 'Ready for images',
+      description: 'Property details have been filled. You can now add images manually.',
+    })
+  }
+
+  // Handler for when user wants to continue without images
+  const handleContinueWithoutImages = async () => {
+    if (!scrapedDataForFallback) return
+
+    setShowNoImagesPrompt(false)
+    setIsCreatingProperty(true)
+
+    const { scrapedPrice, isRental } = scrapedDataForFallback
+
+    try {
+      // Save the property without images, using scraped price
+      const newProperty = {
+        address: scrapedDataForFallback.address,
+        bedrooms: scrapedDataForFallback.bedrooms,
+        bathrooms: scrapedDataForFallback.bathrooms,
+        area: scrapedDataForFallback.area,
+        zillow_url: scrapedDataForFallback.zillowUrl,
+        images: [] as string[],
+        description: scrapedDataForFallback.description || undefined,
+        // For rentals, set monthly rent from scraped price
+        show_monthly_rent: isRental && scrapedPrice ? true : newPropertyData.show_monthly_rent,
+        custom_monthly_rent: isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_monthly_rent || null),
+        show_nightly_rate: newPropertyData.show_nightly_rate,
+        custom_nightly_rate: newPropertyData.custom_nightly_rate || null,
+        // For sales, set purchase price from scraped price
+        show_purchase_price: !isRental && scrapedPrice ? true : newPropertyData.show_purchase_price,
+        custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_purchase_price || null),
+      }
+
+      const savedProperty = await saveProperty(newProperty)
+
+      // Get current manager and assign property
+      const { data: managerProfile } = await getCurrentManagerProfile()
+      if (managerProfile && savedProperty.id) {
+        await assignPropertyToManagers(savedProperty.id, [managerProfile.id])
+      }
+
+      // Assign to client
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
+
+      const { data: existingAssignments } = await supabase
+        .from('client_property_assignments')
+        .select('position')
+        .eq('client_id', clientId)
+        .order('position', { ascending: false })
+        .limit(1)
+
+      const nextPosition = existingAssignments && existingAssignments.length > 0
+        ? (existingAssignments[0].position || 0) + 1
+        : 0
+
+      await supabase.from('client_property_assignments').insert({
+        client_id: clientId,
+        property_id: savedProperty.id,
+        position: nextPosition,
+        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
+        show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
+        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
+      })
+
+      // Generate AI description
+      try {
+        await fetch('/api/generate-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            propertyId: savedProperty.id,
+            address: scrapedDataForFallback.address,
+            bedrooms: scrapedDataForFallback.bedrooms,
+            bathrooms: scrapedDataForFallback.bathrooms,
+            area: scrapedDataForFallback.area,
+          }),
+        })
+      } catch (descError) {
+        console.warn('AI description generation failed:', descError)
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Property created without images',
+      })
+      setShowNewPropertyModal(false)
+      setScrapedDataForFallback(null)
+      router.refresh()
+    } catch (error) {
+      console.error('Error creating property:', error)
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsCreatingProperty(false)
+    }
+  }
+
   const handleCreateProperty = async () => {
     if (!newPropertyData.address.trim()) {
       toast({
@@ -729,16 +964,6 @@ export function ClientPropertyAssignment({
     setIsCreatingProperty(true)
 
     try {
-      // Parse images from comma-separated URLs if provided in manual mode
-      let allImages = [...(newPropertyData.images || [])]
-      if (manualImageUrls.trim()) {
-        const urlImages = manualImageUrls
-          .split(',')
-          .map(url => url.trim())
-          .filter(url => url.length > 0)
-        allImages = [...allImages, ...urlImages]
-      }
-
       // Save the property with all data
       const newProperty = {
         address: newPropertyData.address,
@@ -746,7 +971,7 @@ export function ClientPropertyAssignment({
         bathrooms: newPropertyData.bathrooms || "",
         area: newPropertyData.area || "",
         zillow_url: "",
-        images: allImages,
+        images: newPropertyData.images || [],
         description: manualDescription || undefined,
         show_monthly_rent: newPropertyData.show_monthly_rent,
         custom_monthly_rent: newPropertyData.custom_monthly_rent || null,
@@ -810,7 +1035,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property created and assigned to client',
+        description: 'Property created and added to client',
       })
       setShowNewPropertyModal(false)
       router.refresh()
@@ -1091,64 +1316,12 @@ export function ClientPropertyAssignment({
                   <p className="text-xs text-white/50 mt-1">Leave blank to auto-generate with AI</p>
                 </div>
 
-                {/* Images - Upload */}
+                {/* Images - Drag & Drop Upload */}
                 <div>
                   <Label className="text-white mb-2 block">Images</Label>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageUpload}
-                    className="hidden"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingImage || isCreatingProperty}
-                    className="w-full border-white/30 text-white hover:bg-white/10"
-                  >
-                    {uploadingImage ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Upload Images
-                      </>
-                    )}
-                  </Button>
-                  {newPropertyData.images && newPropertyData.images.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {newPropertyData.images.map((img, idx) => (
-                        <div key={idx} className="relative w-16 h-16 rounded overflow-hidden group">
-                          <img src={img} alt={`Property ${idx + 1}`} className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(img)}
-                            className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
-                            disabled={isCreatingProperty}
-                          >
-                            <X className="h-4 w-4 text-white" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Image URLs */}
-                <div>
-                  <Label htmlFor="image_urls" className="text-white mb-2 block">Or paste Image URLs</Label>
-                  <Textarea
-                    id="image_urls"
-                    value={manualImageUrls}
-                    onChange={(e) => setManualImageUrls(e.target.value)}
-                    placeholder="Comma-separated image URLs..."
-                    className="bg-white/5 border-white/30 text-white placeholder:text-white/40 min-h-[60px]"
+                  <ImageDropZone
+                    images={newPropertyData.images || []}
+                    onImagesChange={(images) => setNewPropertyData(prev => ({ ...prev, images }))}
                     disabled={isCreatingProperty}
                   />
                 </div>
@@ -1273,7 +1446,7 @@ export function ClientPropertyAssignment({
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
-                  {inputMode === 'scrape' ? 'Scrape & Add' : 'Create Property'}
+                  {inputMode === 'scrape' ? 'Scrape & Add' : 'Create & Add'}
                 </>
               )}
             </Button>
@@ -1284,30 +1457,93 @@ export function ClientPropertyAssignment({
     )
   }
 
+  // No images prompt modal
+  const renderNoImagesPrompt = () => {
+    if (!isMounted || !showNoImagesPrompt || !scrapedDataForFallback) return null
+
+    return createPortal(
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+        <div className="bg-zinc-900 border border-white/20 rounded-lg p-6 max-w-md w-full">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 rounded-full bg-yellow-500/20">
+              <ImageOff className="h-6 w-6 text-yellow-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-white">No Images Found</h3>
+          </div>
+
+          <p className="text-white/70 mb-2">
+            We couldn't find any images for this property:
+          </p>
+          <p className="text-white font-medium mb-4 truncate">
+            {scrapedDataForFallback.address}
+          </p>
+          <p className="text-white/60 text-sm mb-6">
+            Would you like to add images manually, or continue without images?
+          </p>
+
+          <div className="flex flex-col gap-3">
+            <Button
+              onClick={handleAddImagesManually}
+              className="w-full bg-white text-black hover:bg-white/90"
+            >
+              Add Images Manually
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleContinueWithoutImages}
+              disabled={isCreatingProperty}
+              className="w-full border-white/30 text-white hover:bg-white/10"
+            >
+              {isCreatingProperty ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                'Continue Without Images'
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowNoImagesPrompt(false)
+                setScrapedDataForFallback(null)
+              }}
+              className="w-full text-white/60 hover:text-white hover:bg-white/5"
+            >
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    )
+  }
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
       {/* Assigned Properties Section */}
       <Card className="glass-card border-white/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">{clientName}'s Properties</CardTitle>
-              <CardDescription className="text-white/70">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle className="text-white text-base sm:text-lg truncate">{clientName}'s Properties</CardTitle>
+              <CardDescription className="text-white/70 text-xs sm:text-sm">
                 {assignedProperties.length} {assignedProperties.length === 1 ? 'property' : 'properties'} assigned
               </CardDescription>
             </div>
             {isSavingOrder && (
-              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400">
+              <Badge variant="secondary" className="bg-blue-500/20 text-blue-400 flex-shrink-0 text-xs">
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                 Saving...
               </Badge>
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-3">
           {assignedProperties.length === 0 ? (
-            <div className="text-center py-12">
-              <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
+            <div className="text-center py-8 sm:py-12">
+              <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
               <p className="text-white/60">No properties assigned yet</p>
               <p className="text-sm text-white/40 mt-1">Add properties from the available list</p>
             </div>
@@ -1341,32 +1577,109 @@ export function ClientPropertyAssignment({
                       : ''
                   } cursor-move hover:bg-white/5`}
                 >
-                  <div className="flex items-center gap-3">
-                    {/* Desktop Drag Handle */}
-                    <div className="hidden md:flex items-center justify-center w-8">
-                      <GripVertical className="h-5 w-5 text-white/50" />
-                    </div>
+                  {/* Mobile Layout */}
+                  <div className="md:hidden">
+                    <div className="flex items-start gap-3">
+                      {/* Mobile Move Buttons */}
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                          className="h-6 w-6 p-0 hover:bg-white/10"
+                        >
+                          <ChevronUp className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleMoveDown(index)}
+                          disabled={index === assignedProperties.length - 1}
+                          className="h-6 w-6 p-0 hover:bg-white/10"
+                        >
+                          <ChevronDown className="h-4 w-4" />
+                        </Button>
+                      </div>
 
-                    {/* Mobile Move Buttons */}
-                    <div className="flex md:hidden flex-col gap-1">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                        className="h-6 w-6 p-0 hover:bg-white/10"
-                      >
-                        <ChevronUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleMoveDown(index)}
-                        disabled={index === assignedProperties.length - 1}
-                        className="h-6 w-6 p-0 hover:bg-white/10"
-                      >
-                        <ChevronDown className="h-4 w-4" />
-                      </Button>
+                      {/* Property Image */}
+                      {firstImage && (
+                        <div className="w-20 h-20 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                          <img
+                            src={firstImage}
+                            alt={property.address || 'Property'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
+
+                      {/* Content and Actions */}
+                      <div className="flex-1 min-w-0">
+                        {/* Address - full width, wrapping allowed */}
+                        <p className="text-white font-medium text-sm leading-tight mb-1">
+                          {property.address || 'Unknown Address'}
+                        </p>
+                        {/* Property specs */}
+                        <div className="flex flex-wrap gap-2 text-xs text-white/60 mb-2">
+                          {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                          {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                          {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                        </div>
+                        {/* Actions row */}
+                        <div className="flex gap-1.5">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={!!isAssigning}
+                                className="h-7 w-7 p-0 hover:bg-white/10 text-white"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="bg-zinc-900 border-white/20">
+                              <DropdownMenuItem
+                                onClick={() => handleEditPricing(property)}
+                                className="text-white hover:bg-white/10 cursor-pointer"
+                              >
+                                <Settings className="h-4 w-4 mr-2" />
+                                Pricing Settings
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild className="text-white hover:bg-white/10 cursor-pointer">
+                                <Link href={`/admin/properties/${property.id}/edit?returnTo=/admin/client/${clientId}`}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Edit Property
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleRemove(property.id)}
+                            disabled={isAssigning === property.id}
+                            className="h-7 w-7 p-0 hover:bg-red-500/20 text-red-400"
+                          >
+                            {isAssigning === property.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Desktop Layout */}
+                  <div className="hidden md:flex items-center gap-3">
+                    {/* Desktop Drag Handle */}
+                    <div className="flex items-center justify-center w-8">
+                      <GripVertical className="h-5 w-5 text-white/50" />
                     </div>
 
                     {/* Property Image */}
@@ -1395,15 +1708,33 @@ export function ClientPropertyAssignment({
 
                     {/* Actions */}
                     <div className="flex gap-2 flex-shrink-0">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleEditPricing(property)}
-                        disabled={!!isAssigning}
-                        className="hover:bg-white/10 text-white"
-                      >
-                        <Settings className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            disabled={!!isAssigning}
+                            className="hover:bg-white/10 text-white"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/20">
+                          <DropdownMenuItem
+                            onClick={() => handleEditPricing(property)}
+                            className="text-white hover:bg-white/10 cursor-pointer"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Pricing Settings
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild className="text-white hover:bg-white/10 cursor-pointer">
+                            <Link href={`/admin/properties/${property.id}/edit?returnTo=/admin/client/${clientId}`}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit Property
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -1426,13 +1757,13 @@ export function ClientPropertyAssignment({
         </CardContent>
       </Card>
 
-      {/* Available Properties Section */}
+      {/* Saved Properties Section */}
       <Card className="glass-card border-white/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-white">Available Properties</CardTitle>
-              <CardDescription className="text-white/70">
+        <CardHeader className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-white text-base sm:text-lg">Saved Properties</CardTitle>
+              <CardDescription className="text-white/70 text-xs sm:text-sm">
                 {availableProperties.length} {availableProperties.length === 1 ? 'property' : 'properties'} available
               </CardDescription>
             </div>
@@ -1440,33 +1771,34 @@ export function ClientPropertyAssignment({
               <Button
                 size="sm"
                 onClick={handleOpenNewPropertyModal}
-                className="bg-white text-black hover:bg-white/90"
+                className="bg-white text-black hover:bg-white/90 text-xs sm:text-sm h-8 sm:h-9"
               >
-                <Plus className="h-4 w-4 mr-1" />
-                New Property
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                <span className="hidden sm:inline">New Property</span>
+                <span className="sm:hidden">New</span>
               </Button>
               <Button
                 size="sm"
                 variant={isBulkMode ? 'default' : 'outline'}
                 onClick={toggleBulkMode}
-                className={isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}
+                className={`text-xs sm:text-sm h-8 sm:h-9 ${isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}`}
               >
                 {isBulkMode ? (
                   <>
-                    <CheckSquare className="h-4 w-4 mr-2" />
-                    Bulk Mode
+                    <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Bulk Mode</span>
                   </>
                 ) : (
                   <>
-                    <Square className="h-4 w-4 mr-2" />
-                    Bulk Select
+                    <Square className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Bulk Select</span>
                   </>
                 )}
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0 space-y-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
             <Input
@@ -1516,11 +1848,11 @@ export function ClientPropertyAssignment({
             </div>
           )}
 
-          <div className="space-y-2 max-h-[600px] overflow-y-auto">
+          <div className="space-y-2 max-h-[400px] sm:max-h-[600px] overflow-y-auto">
             {filteredAvailable.length === 0 ? (
-              <div className="text-center py-12">
-                <Home className="h-12 w-12 mx-auto mb-3 text-white/30" />
-                <p className="text-white/60">
+              <div className="text-center py-8 sm:py-12">
+                <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
+                <p className="text-white/60 text-sm sm:text-base">
                   {searchQuery ? 'No properties match your search' : 'All properties have been assigned'}
                 </p>
               </div>
@@ -1537,7 +1869,64 @@ export function ClientPropertyAssignment({
                       isBulkMode ? 'cursor-pointer hover:bg-white/10' : ''
                     } ${isSelected ? 'ring-2 ring-blue-500 bg-blue-500/10' : ''}`}
                   >
-                    <div className="flex items-center gap-3">
+                    {/* Mobile Layout */}
+                    <div className="md:hidden">
+                      <div className="flex items-start gap-3">
+                        {/* Bulk Select Checkbox */}
+                        {isBulkMode && (
+                          <div className="flex-shrink-0 pt-1">
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => togglePropertySelection(property.id)}
+                              className="border-white/30 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                            />
+                          </div>
+                        )}
+
+                        {/* Property Image */}
+                        {firstImage && (
+                          <div className="w-20 h-20 rounded overflow-hidden bg-white/5 flex-shrink-0">
+                            <img
+                              src={firstImage}
+                              alt={property.address || 'Property'}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        )}
+
+                        {/* Content and Action */}
+                        <div className="flex-1 min-w-0">
+                          {/* Address - full width, wrapping allowed */}
+                          <p className="text-white font-medium text-sm leading-tight mb-1">
+                            {property.address || 'Unknown Address'}
+                          </p>
+                          {/* Property specs */}
+                          <div className="flex flex-wrap gap-2 text-xs text-white/60 mb-2">
+                            {property.bedrooms && <span>{property.bedrooms} bed</span>}
+                            {property.bathrooms && <span>{property.bathrooms} bath</span>}
+                            {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                          </div>
+                          {/* Add Button (only in single mode) */}
+                          {!isBulkMode && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleStartAssign(property)}
+                              disabled={!!isAssigning}
+                              className="h-7 px-3 bg-white text-black hover:bg-white/90 text-xs"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add to Client
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Desktop Layout */}
+                    <div className="hidden md:flex items-center gap-3">
                       {/* Bulk Select Checkbox */}
                       {isBulkMode && (
                         <div className="flex-shrink-0">
@@ -1596,6 +1985,7 @@ export function ClientPropertyAssignment({
 
       {renderPricingModal()}
       {renderNewPropertyModal()}
+      {renderNoImagesPrompt()}
     </div>
   )
 }

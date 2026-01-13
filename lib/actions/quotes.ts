@@ -34,6 +34,9 @@ export type Quote = {
   responded_at: string | null
   converted_to_invoice_id: string | null
   pdf_customization: PDFCustomization | null
+  // Manager info (populated from join)
+  manager_email?: string
+  manager_name?: string
 }
 
 export type QuoteWithItems = Quote & {
@@ -42,16 +45,32 @@ export type QuoteWithItems = Quote & {
 
 // PDF Customization types for visual quote builder
 export type ServiceOverride = {
-  display_name?: string
+  display_name?: string        // e.g., "2022 LearJet"
   display_description?: string
-  display_images?: string[]  // Selected images (max 2) from available images
+  display_images?: string[]    // Selected images (max 2) - exterior and interior
   details?: { label: string; value: string }[]  // e.g., Date, Departure, Arrival
+  // Jet-specific fields
+  jet_model?: string           // e.g., "45xr"
+  passengers?: string          // e.g., "8"
+  flight_time?: string         // e.g., "3h 27m"
+  services_list?: string[]     // e.g., ["Crew & in-flight refreshments", "VIP handling"]
+  price_override?: number      // Override price for display
+  // Route fields for individual products (cars/yachts)
+  departure_city?: string      // e.g., "AIRPORT" or "MIAMI"
+  arrival_city?: string        // e.g., "HOTEL" or "BAHAMAS"
 }
 
 export type PDFCustomization = {
   header_title?: string
   header_subtitle?: string
   header_icon?: 'plane' | 'car' | 'yacht' | 'none'
+  // Route info for jet quotes
+  route?: {
+    departure_code?: string    // e.g., "SCF"
+    departure_city?: string    // e.g., "Scottsdale"
+    arrival_code?: string      // e.g., "LAS"
+    arrival_city?: string      // e.g., "Las Vegas"
+  }
   service_overrides?: {
     [serviceItemId: string]: ServiceOverride
   }
@@ -119,13 +138,122 @@ export async function getQuotes() {
   return { data: updatedQuotes as Quote[] }
 }
 
+// Get ALL quotes in the system (for master view - all team members can access)
+export async function getAllQuotesSystem(filterManagerId?: string) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // Build query
+  let query = supabase
+    .from('quotes')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .order('created_at', { ascending: false })
+
+  // Apply manager filter if provided
+  if (filterManagerId && filterManagerId !== 'all') {
+    query = query.eq('manager_id', filterManagerId)
+  }
+
+  const { data: quotes, error } = await query
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for expired quotes and update status
+  const now = new Date()
+  const updatedQuotes = quotes?.map((quote: any) => {
+    if (quote.status === 'sent' || quote.status === 'viewed') {
+      const expirationDate = new Date(quote.expiration_date)
+      if (expirationDate < now) {
+        return { ...quote, status: 'expired' as QuoteStatus }
+      }
+    }
+    return quote
+  }) || []
+
+  return { data: updatedQuotes }
+}
+
+// Get quotes for a specific client (by email only)
+export async function getQuotesByClient(clientEmail: string | null) {
+  const supabase = await createClient()
+
+  // Verify user is authenticated
+  const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { error: 'Not authenticated', data: [] }
+  }
+
+  // If no email provided, return empty
+  if (!clientEmail) {
+    return { data: [] }
+  }
+
+  // Build query - search by email only
+  const { data: quotes, error } = await supabase
+    .from('quotes')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
+    .eq('client_email', clientEmail)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return { error: error.message, data: [] }
+  }
+
+  // Check for expired quotes and update status
+  const now = new Date()
+  const updatedQuotes = quotes?.map((quote: any) => {
+    if (quote.status === 'sent' || quote.status === 'viewed') {
+      const expirationDate = new Date(quote.expiration_date)
+      if (expirationDate < now) {
+        return { ...quote, status: 'expired' as QuoteStatus }
+      }
+    }
+    return quote
+  }) || []
+
+  return { data: updatedQuotes }
+}
+
 // Get single quote with service items
 export async function getQuoteById(quoteId: string) {
   const supabase = await createClient()
 
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
-    .select('*')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
     .eq('id', quoteId)
     .single()
 
@@ -143,10 +271,16 @@ export async function getQuoteById(quoteId: string) {
     return { error: itemsError.message, data: null }
   }
 
+  // Extract manager info from the joined data
+  const managerInfo = (quote as any).property_managers
+  const { property_managers, ...quoteData } = quote as any
+
   return {
     data: {
-      ...quote,
-      service_items: serviceItems || []
+      ...quoteData,
+      service_items: serviceItems || [],
+      manager_email: managerInfo?.email,
+      manager_name: managerInfo?.name ? `${managerInfo.name} ${managerInfo.last_name || ''}`.trim() : undefined,
     } as QuoteWithItems
   }
 }
@@ -157,7 +291,15 @@ export async function getQuoteByNumber(quoteNumber: string) {
 
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
-    .select('*')
+    .select(`
+      *,
+      property_managers (
+        id,
+        name,
+        last_name,
+        email
+      )
+    `)
     .eq('quote_number', quoteNumber)
     .single()
 
@@ -186,10 +328,16 @@ export async function getQuoteByNumber(quoteNumber: string) {
       .eq('id', quote.id)
   }
 
+  // Extract manager info from the joined data
+  const managerInfo = (quote as any).property_managers
+  const { property_managers, ...quoteData } = quote as any
+
   return {
     data: {
-      ...quote,
-      service_items: serviceItems || []
+      ...quoteData,
+      service_items: serviceItems || [],
+      manager_email: managerInfo?.email,
+      manager_name: managerInfo?.name ? `${managerInfo.name} ${managerInfo.last_name || ''}`.trim() : undefined,
     } as QuoteWithItems
   }
 }

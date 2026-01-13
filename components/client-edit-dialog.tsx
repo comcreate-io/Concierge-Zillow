@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -22,10 +23,11 @@ interface ClientEditDialogProps {
   clientName: string
   clientEmail: string | null
   clientPhone: string | null
+  clientCriteria: string | null
   clientSlug: string | null
 }
 
-export function ClientEditDialog({ clientId, clientName, clientEmail, clientPhone, clientSlug }: ClientEditDialogProps) {
+export function ClientEditDialog({ clientId, clientName, clientEmail, clientPhone, clientCriteria, clientSlug }: ClientEditDialogProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { toast } = useToast()
@@ -115,6 +117,21 @@ export function ClientEditDialog({ clientId, clientName, clientEmail, clientPhon
               placeholder="(555) 123-4567"
               className="bg-white/5 border-white/30 text-white placeholder:text-white/40"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="criteria" className="text-white/90">
+              Search Criteria (optional)
+            </Label>
+            <Textarea
+              id="criteria"
+              name="criteria"
+              defaultValue={clientCriteria || ''}
+              placeholder="e.g., 3+ bedrooms, $500k-$700k budget, move-in by March, prefers downtown area"
+              className="bg-white/5 border-white/30 text-white placeholder:text-white/40 min-h-[80px] resize-none"
+            />
+            <p className="text-xs text-white/50">
+              What is the client looking for? (bedrooms, budget, move-in date, location, etc.)
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="slug" className="text-white/90">

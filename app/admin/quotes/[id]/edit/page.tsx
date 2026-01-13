@@ -1,15 +1,25 @@
 import { QuoteForm } from '@/components/quote-form'
 import { getQuoteById } from '@/lib/actions/quotes'
+import { getAllClients } from '@/lib/actions/clients'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { notFound } from 'next/navigation'
 
 interface EditQuotePageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ from?: string; clientId?: string }>
 }
 
-export default async function EditQuotePage({ params }: EditQuotePageProps) {
-  const { data: quote, error } = await getQuoteById(params.id)
+export default async function EditQuotePage({ params, searchParams }: EditQuotePageProps) {
+  const { id } = await params
+  const { from, clientId } = await searchParams
+
+  const [quoteResult, clientsResult] = await Promise.all([
+    getQuoteById(id),
+    getAllClients()
+  ])
+
+  const { data: quote, error } = quoteResult
 
   if (error || !quote) {
     notFound()
@@ -34,15 +44,25 @@ export default async function EditQuotePage({ params }: EditQuotePageProps) {
     )
   }
 
+  // Transform clients to the format expected by the form
+  const clientOptions = (clientsResult.data || []).map(client => ({
+    id: client.id,
+    name: client.name,
+    email: client.email,
+  }))
+
+  // Determine back URL based on where user came from
+  const backUrl = from === 'client' && clientId ? `/admin/client/${clientId}` : '/admin/quotes'
+
   return (
     <div className="space-y-8">
       <div>
         <Link
-          href="/admin/quotes"
+          href={backUrl}
           className="inline-flex items-center text-white/70 hover:text-white mb-4 transition-colors"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Quotes
+          Back
         </Link>
         <h1 className="luxury-heading text-3xl sm:text-4xl font-bold tracking-widest text-white">
           Edit Quote
@@ -52,7 +72,7 @@ export default async function EditQuotePage({ params }: EditQuotePageProps) {
         </p>
       </div>
 
-      <QuoteForm quote={quote} mode="edit" />
+      <QuoteForm quote={quote} mode="edit" clients={clientOptions} backUrl={backUrl} />
     </div>
   )
 }

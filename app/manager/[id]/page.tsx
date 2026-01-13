@@ -57,8 +57,14 @@ export default async function ManagerPublicPage({
             {/* Manager Info */}
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
-                <h1 className="luxury-heading text-3xl sm:text-4xl font-bold text-white tracking-[0.2em] mb-2">{manager.name}</h1>
-                <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">Property Manager Portfolio</p>
+                <h1 className="luxury-heading text-3xl sm:text-4xl font-bold text-white tracking-[0.2em] mb-2">
+                  {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
+                </h1>
+                {manager.title ? (
+                  <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">{manager.title}</p>
+                ) : (
+                  <p className="text-white/80 tracking-[0.15em] uppercase text-sm sm:text-base font-medium">Property Manager Portfolio</p>
+                )}
               </div>
               <Badge variant="secondary" className="bg-white/15 text-white border-white/30 backdrop-blur-md text-base sm:text-xl px-5 sm:px-6 py-2 sm:py-3 shadow-lg">
                 {propertyList.length} {propertyList.length === 1 ? 'Property' : 'Properties'}
@@ -114,7 +120,7 @@ export default async function ManagerPublicPage({
         ) : (
           <div className="animate-fade-in">
             <h2 className="luxury-heading text-3xl font-bold mb-8 text-white tracking-[0.2em]">
-              Available Properties
+              Saved Properties
             </h2>
             <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
               {propertyList.map((property) => (
@@ -136,7 +142,7 @@ export default async function ManagerPublicPage({
       {/* Footer */}
       <footer className="mt-20 border-t border-white/10 backdrop-blur-md bg-black/20 shadow-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 text-center text-white/80">
-          <p className="luxury-heading tracking-[0.2em] text-base mb-4">Managed by {manager.name}</p>
+          <p className="luxury-heading tracking-[0.2em] text-base mb-4">Managed by {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}</p>
           <p className="text-base tracking-wide leading-relaxed">
             For inquiries, contact{' '}
             <a href={`mailto:${manager.email}`} className="text-white font-medium hover:text-white/90 transition-colors underline decoration-white/30 hover:decoration-white/60">
@@ -163,14 +169,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const supabase = await createClient()
   const { data: manager } = await supabase
     .from('property_managers')
-    .select('name')
+    .select('name, last_name')
     .eq('id', id)
     .single()
 
+  const fullName = manager
+    ? (manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name)
+    : null
+
   return {
-    title: manager ? `${manager.name} - Property Portfolio` : 'Property Manager',
-    description: manager
-      ? `View all properties managed by ${manager.name}`
+    title: fullName ? `${fullName} - Property Portfolio` : 'Property Manager',
+    description: fullName
+      ? `View all properties managed by ${fullName}`
       : 'Property manager portfolio',
   }
 }

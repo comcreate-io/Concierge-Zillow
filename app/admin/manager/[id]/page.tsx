@@ -69,15 +69,18 @@ export default async function ManagerPropertiesPage({
                 <ProfilePictureUpload
                   managerId={id}
                   currentPictureUrl={manager.profile_picture_url}
-                  managerName={manager.name}
+                  managerName={manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
                 />
               </div>
 
               {/* Manager Info */}
               <div className="flex-1">
-                <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white mb-4">
-                  {manager.name}
+                <h1 className="luxury-heading text-2xl sm:text-3xl md:text-4xl font-bold tracking-[0.15em] text-white mb-2">
+                  {manager.last_name ? `${manager.name} ${manager.last_name}` : manager.name}
                 </h1>
+                {manager.title && (
+                  <p className="text-white/70 tracking-wide mb-4">{manager.title}</p>
+                )}
                 <div className="flex flex-col gap-3 text-white/80">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-white/10 rounded-lg">

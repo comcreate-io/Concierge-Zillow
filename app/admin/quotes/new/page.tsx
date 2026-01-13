@@ -1,8 +1,18 @@
 import { QuoteForm } from '@/components/quote-form'
+import { getAllClients } from '@/lib/actions/clients'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 
-export default function NewQuotePage() {
+export default async function NewQuotePage() {
+  const { data: clients } = await getAllClients()
+
+  // Transform clients to the format expected by the form
+  const clientOptions = (clients || []).map(client => ({
+    id: client.id,
+    name: client.name,
+    email: client.email,
+  }))
+
   return (
     <div className="space-y-8">
       <div>
@@ -21,7 +31,7 @@ export default function NewQuotePage() {
         </p>
       </div>
 
-      <QuoteForm mode="create" />
+      <QuoteForm mode="create" clients={clientOptions} />
     </div>
   )
 }

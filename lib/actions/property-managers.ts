@@ -6,9 +6,15 @@ import { revalidatePath } from 'next/cache'
 export type PropertyManager = {
   id: string
   name: string
+  last_name: string | null
+  title: string | null
   email: string
   phone: string | null
   profile_picture_url: string | null
+  instagram_url: string | null
+  facebook_url: string | null
+  linkedin_url: string | null
+  twitter_url: string | null
   created_at: string
   updated_at: string
 }
