@@ -1,4 +1,4 @@
-import { getManagerProperties } from '@/lib/actions/properties'
+import { getManagerProperties, getSavedPropertyIds } from '@/lib/actions/properties'
 import { PropertiesListClient } from '@/components/properties-list-client'
 import { createClient } from '@/lib/supabase/server'
 
@@ -11,6 +11,9 @@ export default async function PropertiesPage() {
   if (error) {
     console.error('Error fetching properties:', error)
   }
+
+  // Get saved property IDs
+  const { data: savedPropertyIds } = await getSavedPropertyIds()
 
   // Get all managers for display purposes
   const { data: managers } = await supabase
@@ -28,6 +31,7 @@ export default async function PropertiesPage() {
       initialProperties={properties || []}
       managers={managers || []}
       assignments={assignments || []}
+      savedPropertyIds={savedPropertyIds || []}
     />
   )
 }

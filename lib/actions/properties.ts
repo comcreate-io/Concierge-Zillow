@@ -445,3 +445,132 @@ export async function createPropertyAndAssignToClient(
 
   return { success: true, property }
 }
+
+// ============ SAVED PROPERTIES FUNCTIONS ============
+
+// Get saved properties for the current manager
+export async function getSavedProperties() {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found', data: [] }
+  }
+
+  // Get saved property IDs
+  const { data: savedEntries, error: savedError } = await supabase
+    .from('saved_properties')
+    .select('property_id')
+    .eq('manager_id', managerProfile.id)
+
+  if (savedError) {
+    return { error: savedError.message, data: [] }
+  }
+
+  const propertyIds = savedEntries?.map(s => s.property_id) || []
+
+  if (propertyIds.length === 0) {
+    return { data: [] }
+  }
+
+  // Get the actual properties
+  const { data: properties, error: propertiesError } = await supabase
+    .from('properties')
+    .select('*')
+    .in('id', propertyIds)
+
+  if (propertiesError) {
+    return { error: propertiesError.message, data: [] }
+  }
+
+  return { data: properties as Property[] }
+}
+
+// Get saved property IDs for the current manager
+export async function getSavedPropertyIds() {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found', data: [] }
+  }
+
+  const { data: savedEntries, error: savedError } = await supabase
+    .from('saved_properties')
+    .select('property_id')
+    .eq('manager_id', managerProfile.id)
+
+  if (savedError) {
+    return { error: savedError.message, data: [] }
+  }
+
+  return { data: savedEntries?.map(s => s.property_id) || [] }
+}
+
+// Save a property
+export async function saveProperty(propertyId: string) {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  const { error } = await supabase
+    .from('saved_properties')
+    .insert({
+      manager_id: managerProfile.id,
+      property_id: propertyId,
+    })
+
+  if (error) {
+    // Check if it's a duplicate
+    if (error.code === '23505') {
+      return { success: true } // Already saved
+    }
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/properties')
+  return { success: true }
+}
+
+// Unsave a property
+export async function unsaveProperty(propertyId: string) {
+  const supabase = await createClient()
+
+  // Get current manager profile
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  const { error } = await supabase
+    .from('saved_properties')
+    .delete()
+    .eq('manager_id', managerProfile.id)
+    .eq('property_id', propertyId)
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  revalidatePath('/admin/properties')
+  return { success: true }
+}
+
+// Toggle save state for a property
+export async function toggleSaveProperty(propertyId: string, isSaved: boolean) {
+  if (isSaved) {
+    return unsaveProperty(propertyId)
+  } else {
+    return saveProperty(propertyId)
+  }
+}

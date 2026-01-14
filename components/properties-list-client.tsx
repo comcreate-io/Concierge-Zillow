@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Home, MapPin, BedDouble, Bath, Maximize, ExternalLink, Pencil, Plus, Search, Trash2, GripVertical, ChevronUp, ChevronDown } from "lucide-react"
+import { Home, MapPin, BedDouble, Bath, Maximize, ExternalLink, Pencil, Plus, Search, Trash2, GripVertical, ChevronUp, ChevronDown, Star } from "lucide-react"
 import Link from "next/link"
 import { PropertyManager } from "@/components/property-manager-select"
 import { formatCurrency, formatNumber, formatPropertyValue } from "@/lib/utils"
-import { deleteProperty, updatePropertyOrder } from "@/lib/actions/properties"
+import { deleteProperty, updatePropertyOrder, toggleSaveProperty } from "@/lib/actions/properties"
 
 interface Property {
   id: string
@@ -48,6 +48,9 @@ function PropertyCard({
   isDragging,
   isDragOver,
   dragDirection,
+  isSaved,
+  onToggleSave,
+  savingId,
 }: {
   property: Property
   index: number
@@ -63,6 +66,9 @@ function PropertyCard({
   isDragging: boolean
   isDragOver: boolean
   dragDirection: 'up' | 'down' | null
+  isSaved: boolean
+  onToggleSave: (id: string, isSaved: boolean) => void
+  savingId: string | null
 }) {
   const cardRef = useRef<HTMLDivElement>(null)
   const firstImage = property.images.length > 0 ? property.images[0] : null
@@ -218,10 +224,23 @@ function PropertyCard({
                 onClick={(e) => {
                   e.preventDefault()
                   e.stopPropagation()
+                  onToggleSave(property.id, isSaved)
+                }}
+                disabled={savingId === property.id}
+                className={`h-6 px-2 text-[10px] ml-auto ${isSaved ? 'border-amber-500/40 text-amber-400' : 'border-white/40 text-white/70'}`}
+              >
+                <Star className={`h-2.5 w-2.5 ${isSaved ? 'fill-amber-400' : ''}`} />
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
                   onDelete(property.id)
                 }}
                 disabled={deletingId === property.id}
-                className="h-6 px-2 text-[10px] border-red-500/40 text-red-400 ml-auto"
+                className="h-6 px-2 text-[10px] border-red-500/40 text-red-400"
               >
                 <Trash2 className="h-2.5 w-2.5" />
               </Button>
@@ -366,9 +385,19 @@ function PropertyCard({
             <Button
               size="sm"
               variant="outline"
+              onClick={() => onToggleSave(property.id, isSaved)}
+              disabled={savingId === property.id}
+              className={`ml-auto ${isSaved ? 'border-amber-500/40 hover:bg-amber-500 hover:text-black hover:border-amber-500 text-amber-400' : 'border-white/40 hover:bg-white hover:text-black text-white/70'}`}
+            >
+              <Star className={`h-3 w-3 mr-1 ${isSaved ? 'fill-amber-400' : ''}`} />
+              {savingId === property.id ? 'Saving...' : isSaved ? 'Saved' : 'Save'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
               onClick={() => onDelete(property.id)}
               disabled={deletingId === property.id}
-              className="border-red-500/40 hover:bg-red-500 hover:text-white hover:border-red-500 text-red-400 ml-auto"
+              className="border-red-500/40 hover:bg-red-500 hover:text-white hover:border-red-500 text-red-400"
             >
               <Trash2 className="h-3 w-3 mr-1" />
               {deletingId === property.id ? 'Deleting...' : 'Delete'}
@@ -384,15 +413,19 @@ interface PropertiesListClientProps {
   initialProperties: any[]
   managers: any[]
   assignments: any[]
+  savedPropertyIds?: string[]
 }
 
-export function PropertiesListClient({ initialProperties, managers, assignments }: PropertiesListClientProps) {
+export function PropertiesListClient({ initialProperties, managers, assignments, savedPropertyIds: initialSavedIds = [] }: PropertiesListClientProps) {
   const router = useRouter()
   const [properties, setProperties] = useState<Property[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [savedPropertyIds, setSavedPropertyIds] = useState<string[]>(initialSavedIds)
+  const [savingId, setSavingId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'all' | 'saved'>('all')
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
   const [dragDirection, setDragDirection] = useState<'up' | 'down' | null>(null)
@@ -527,20 +560,28 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
   }, [initialProperties, managers, assignments])
 
   const filteredProperties = useMemo(() => {
-    if (!searchQuery.trim()) {
-      return properties
+    let filtered = properties
+
+    // Filter by view mode
+    if (viewMode === 'saved') {
+      filtered = filtered.filter(p => savedPropertyIds.includes(p.id))
     }
 
-    const query = searchQuery.toLowerCase()
-    return properties.filter(property => {
-      if (property.address.toLowerCase().includes(query)) return true
-      if (property.bedrooms.toLowerCase().includes(query)) return true
-      if (property.bathrooms.toLowerCase().includes(query)) return true
-      if (property.area.toLowerCase().includes(query)) return true
-      if (property.managers?.some(m => m.name.toLowerCase().includes(query))) return true
-      return false
-    })
-  }, [properties, searchQuery])
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(property => {
+        if (property.address.toLowerCase().includes(query)) return true
+        if (property.bedrooms.toLowerCase().includes(query)) return true
+        if (property.bathrooms.toLowerCase().includes(query)) return true
+        if (property.area.toLowerCase().includes(query)) return true
+        if (property.managers?.some(m => m.name.toLowerCase().includes(query))) return true
+        return false
+      })
+    }
+
+    return filtered
+  }, [properties, searchQuery, viewMode, savedPropertyIds])
 
   const handleDragStart = (index: number) => {
     setDragIndex(index)
@@ -607,8 +648,23 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
       setDeletingId(null)
     } else {
       setProperties(prev => prev.filter(p => p.id !== propertyId))
+      setSavedPropertyIds(prev => prev.filter(id => id !== propertyId))
       setDeletingId(null)
     }
+  }
+
+  const handleToggleSave = async (propertyId: string, currentlySaved: boolean) => {
+    setSavingId(propertyId)
+    const result = await toggleSaveProperty(propertyId, currentlySaved)
+
+    if (!result.error) {
+      if (currentlySaved) {
+        setSavedPropertyIds(prev => prev.filter(id => id !== propertyId))
+      } else {
+        setSavedPropertyIds(prev => [...prev, propertyId])
+      }
+    }
+    setSavingId(null)
   }
 
   return (
@@ -640,24 +696,59 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
-        <Input
-          type="text"
-          placeholder="Search properties..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10 pr-10 h-11 bg-white/5 border-white/30 focus:border-white text-white placeholder:text-white/50 text-sm"
-        />
-        {searchQuery && (
+      {/* Search Bar and Toggle */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        {/* Toggle Buttons */}
+        <div className="flex rounded-lg overflow-hidden border border-white/30 flex-shrink-0">
           <button
-            onClick={() => setSearchQuery("")}
-            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white"
+            onClick={() => setViewMode('all')}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+              viewMode === 'all'
+                ? 'bg-white text-black'
+                : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
           >
-            <span className="text-xl">×</span>
+            All
           </button>
-        )}
+          <button
+            onClick={() => setViewMode('saved')}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors flex items-center gap-2 ${
+              viewMode === 'saved'
+                ? 'bg-amber-500 text-black'
+                : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+            }`}
+          >
+            <Star className={`h-3.5 w-3.5 ${viewMode === 'saved' ? 'fill-black' : ''}`} />
+            Saved
+            {savedPropertyIds.length > 0 && (
+              <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                viewMode === 'saved' ? 'bg-black/20' : 'bg-amber-500/20 text-amber-400'
+              }`}>
+                {savedPropertyIds.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-white/50" />
+          <Input
+            type="text"
+            placeholder="Search properties..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10 pr-10 h-11 bg-white/5 border-white/30 focus:border-white text-white placeholder:text-white/50 text-sm"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white"
+            >
+              <span className="text-xl">×</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Properties List */}
@@ -679,6 +770,19 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
             Add Property
           </Button>
         </Card>
+      ) : filteredProperties.length === 0 && viewMode === 'saved' ? (
+        <Card className="glass-card-accent p-12 text-center">
+          <Star className="h-16 w-16 text-amber-500/40 mx-auto mb-6" />
+          <h3 className="luxury-heading text-2xl font-semibold mb-3 tracking-[0.1em]">No Saved Properties</h3>
+          <p className="text-white/70 mb-6">Click the star on any property to save it for quick access</p>
+          <Button
+            onClick={() => setViewMode('all')}
+            variant="outline"
+            className="border-white/40 hover:bg-white/10 text-white"
+          >
+            View All Properties
+          </Button>
+        </Card>
       ) : filteredProperties.length === 0 ? (
         <Card className="glass-card-accent p-12 text-center">
           <Search className="h-16 w-16 text-white/40 mx-auto mb-6" />
@@ -692,7 +796,7 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
             Clear Search
           </Button>
         </Card>
-      ) : searchQuery ? (
+      ) : searchQuery || viewMode === 'saved' ? (
         // When searching, don't enable drag
         <div className="grid gap-2 md:gap-4">
           {filteredProperties.map((property, index) => (
@@ -712,6 +816,9 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
               isDragging={false}
               isDragOver={false}
               dragDirection={null}
+              isSaved={savedPropertyIds.includes(property.id)}
+              onToggleSave={handleToggleSave}
+              savingId={savingId}
             />
           ))}
         </div>
@@ -735,6 +842,9 @@ export function PropertiesListClient({ initialProperties, managers, assignments 
               isDragging={dragIndex === index}
               isDragOver={dragOverIndex === index}
               dragDirection={dragDirection}
+              isSaved={savedPropertyIds.includes(property.id)}
+              onToggleSave={handleToggleSave}
+              savingId={savingId}
             />
           ))}
         </div>

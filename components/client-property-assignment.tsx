@@ -565,32 +565,63 @@ export function ClientPropertyAssignment({
         area = (propertyData.livingArea || propertyData.area || "").toString()
       }
 
-      // Extract price from Zillow
+      // Extract price from Zillow - comprehensive check for various response structures
       let scrapedPrice: number | null = null
       let isRental = false
 
+      // Helper function to parse price from various formats
+      const parsePrice = (value: any): number | null => {
+        if (value === null || value === undefined) return null
+        if (typeof value === 'number' && value > 0) return value
+        if (typeof value === 'string') {
+          const parsed = parseInt(value.replace(/[^0-9]/g, ''), 10)
+          return parsed > 0 ? parsed : null
+        }
+        // Handle object with value property (e.g., { value: 500000, currency: 'USD' })
+        if (typeof value === 'object' && value.value) {
+          return parsePrice(value.value)
+        }
+        return null
+      }
+
       // Check if it's a rental property (status can be "FOR_RENT", "FOR_SALE", etc.)
-      const propertyStatus = (propertyData.status || propertyData.homeStatus || '').toString().toUpperCase()
+      const propertyStatus = (propertyData.status || propertyData.homeStatus || propertyData.listingStatus || '').toString().toUpperCase()
 
       if (propertyStatus.includes('RENT') ||
           propertyData.listingSubType?.toLowerCase().includes('rent') ||
-          urlLower.includes('/rental/')) {
+          propertyData.homeType?.toLowerCase().includes('rent') ||
+          urlLower.includes('/rental/') ||
+          urlLower.includes('rent')) {
         isRental = true
-        // For rentals, get the rental price (price field contains monthly rent for rentals)
-        const rawPrice = propertyData.price || propertyData.rentZestimate || propertyData.rent || null
-        if (typeof rawPrice === 'string') {
-          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
-        } else if (typeof rawPrice === 'number') {
-          scrapedPrice = rawPrice
-        }
+        // For rentals, check multiple possible price fields
+        scrapedPrice = parsePrice(propertyData.price) ||
+                       parsePrice(propertyData.rentZestimate) ||
+                       parsePrice(propertyData.rent) ||
+                       parsePrice(propertyData.monthlyRent) ||
+                       parsePrice(propertyData.rentalPrice) ||
+                       parsePrice(propertyData.listing?.price) ||
+                       parsePrice(propertyData.priceHistory?.[0]?.price) ||
+                       null
       } else {
-        // For sale properties
-        const rawPrice = propertyData.price || propertyData.listPrice || propertyData.zestimate || null
-        if (typeof rawPrice === 'string') {
-          scrapedPrice = parseInt(rawPrice.replace(/[^0-9]/g, ''), 10) || null
-        } else if (typeof rawPrice === 'number') {
-          scrapedPrice = rawPrice
-        }
+        // For sale properties, check multiple possible price fields
+        scrapedPrice = parsePrice(propertyData.price) ||
+                       parsePrice(propertyData.listPrice) ||
+                       parsePrice(propertyData.salePrice) ||
+                       parsePrice(propertyData.askingPrice) ||
+                       parsePrice(propertyData.zestimate) ||
+                       parsePrice(propertyData.listing?.price) ||
+                       parsePrice(propertyData.priceHistory?.[0]?.price) ||
+                       parsePrice(propertyData.taxAssessedValue) ||
+                       null
+      }
+
+      // If still no price found, try generic price fields regardless of rental/sale status
+      if (!scrapedPrice) {
+        scrapedPrice = parsePrice(propertyData.price) ||
+                       parsePrice(propertyData.listPrice) ||
+                       parsePrice(propertyData.currentPrice) ||
+                       parsePrice(propertyData.displayPrice) ||
+                       null
       }
 
       // Extract agent info (backend only - not displayed to clients)
@@ -755,6 +786,16 @@ export function ClientPropertyAssignment({
         title: 'Success',
         description: 'Property scraped and added to client',
       })
+
+      // Show warning if price was not found
+      if (!scrapedPrice) {
+        toast({
+          title: 'Price Not Found',
+          description: 'Could not extract price from Zillow. You can add it manually by editing the property.',
+          variant: 'destructive',
+        })
+      }
+
       setShowNewPropertyModal(false)
       router.refresh()
     } catch (error) {
@@ -936,6 +977,16 @@ export function ClientPropertyAssignment({
         title: 'Success',
         description: 'Property created without images',
       })
+
+      // Show warning if price was not found
+      if (!scrapedPrice) {
+        toast({
+          title: 'Price Not Found',
+          description: 'Could not extract price from Zillow. You can add it manually by editing the property.',
+          variant: 'destructive',
+        })
+      }
+
       setShowNewPropertyModal(false)
       setScrapedDataForFallback(null)
       router.refresh()
@@ -1627,6 +1678,15 @@ export function ClientPropertyAssignment({
                           {property.bedrooms && <span>{property.bedrooms} bed</span>}
                           {property.bathrooms && <span>{property.bathrooms} bath</span>}
                           {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                          {property.custom_purchase_price && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_purchase_price)}</span>
+                          )}
+                          {!property.custom_purchase_price && property.custom_monthly_rent && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_monthly_rent)}/mo</span>
+                          )}
+                          {!property.custom_purchase_price && !property.custom_monthly_rent && property.custom_nightly_rate && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_nightly_rate)}/night</span>
+                          )}
                         </div>
                         {/* Actions row */}
                         <div className="flex gap-1.5">
@@ -1703,6 +1763,15 @@ export function ClientPropertyAssignment({
                         {property.bedrooms && <span>{property.bedrooms} bed</span>}
                         {property.bathrooms && <span>{property.bathrooms} bath</span>}
                         {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                        {property.custom_purchase_price && (
+                          <span className="text-emerald-400">{formatCurrency(property.custom_purchase_price)}</span>
+                        )}
+                        {!property.custom_purchase_price && property.custom_monthly_rent && (
+                          <span className="text-emerald-400">{formatCurrency(property.custom_monthly_rent)}/mo</span>
+                        )}
+                        {!property.custom_purchase_price && !property.custom_monthly_rent && property.custom_nightly_rate && (
+                          <span className="text-emerald-400">{formatCurrency(property.custom_nightly_rate)}/night</span>
+                        )}
                       </div>
                     </div>
 
@@ -1908,6 +1977,15 @@ export function ClientPropertyAssignment({
                             {property.bedrooms && <span>{property.bedrooms} bed</span>}
                             {property.bathrooms && <span>{property.bathrooms} bath</span>}
                             {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                            {property.custom_purchase_price && (
+                              <span className="text-emerald-400">{formatCurrency(property.custom_purchase_price)}</span>
+                            )}
+                            {!property.custom_purchase_price && property.custom_monthly_rent && (
+                              <span className="text-emerald-400">{formatCurrency(property.custom_monthly_rent)}/mo</span>
+                            )}
+                            {!property.custom_purchase_price && !property.custom_monthly_rent && property.custom_nightly_rate && (
+                              <span className="text-emerald-400">{formatCurrency(property.custom_nightly_rate)}/night</span>
+                            )}
                           </div>
                           {/* Add Button (only in single mode) */}
                           {!isBulkMode && (
@@ -1959,6 +2037,15 @@ export function ClientPropertyAssignment({
                           {property.bedrooms && <span>{property.bedrooms} bed</span>}
                           {property.bathrooms && <span>{property.bathrooms} bath</span>}
                           {property.area && <span>{formatNumber(property.area)} sqft</span>}
+                          {property.custom_purchase_price && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_purchase_price)}</span>
+                          )}
+                          {!property.custom_purchase_price && property.custom_monthly_rent && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_monthly_rent)}/mo</span>
+                          )}
+                          {!property.custom_purchase_price && !property.custom_monthly_rent && property.custom_nightly_rate && (
+                            <span className="text-emerald-400">{formatCurrency(property.custom_nightly_rate)}/night</span>
+                          )}
                         </div>
                       </div>
 
