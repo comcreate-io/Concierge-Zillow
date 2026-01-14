@@ -71,63 +71,6 @@ export default async function ClientPublicPage({
     }
   }).filter(Boolean) || []) as any[]
 
-  // Function to categorize property by state/region
-  const categorizeProperty = (address: string): string => {
-    if (!address) return 'OTHER'
-    const upperAddress = address.toUpperCase()
-
-    // Check for California
-    if (upperAddress.includes(', CA') || upperAddress.includes(' CA ') ||
-        upperAddress.includes('CALIFORNIA') || upperAddress.endsWith(' CA')) {
-      return 'CA'
-    }
-
-    // Check for New York
-    if (upperAddress.includes(', NY') || upperAddress.includes(' NY ') ||
-        upperAddress.includes('NEW YORK') || upperAddress.endsWith(' NY')) {
-      return 'NYC'
-    }
-
-    // Check for Miami/Florida
-    if (upperAddress.includes(', FL') || upperAddress.includes(' FL ') ||
-        upperAddress.includes('FLORIDA') || upperAddress.includes('MIAMI') ||
-        upperAddress.endsWith(' FL')) {
-      return 'MIA'
-    }
-
-    // Check for international (no US state pattern or contains country names)
-    const usStates = ['AL', 'AK', 'AZ', 'AR', 'CO', 'CT', 'DE', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD', 'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ', 'NM', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC', 'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY', 'DC']
-    const hasUSState = usStates.some(state =>
-      upperAddress.includes(`, ${state}`) || upperAddress.includes(` ${state} `) || upperAddress.endsWith(` ${state}`)
-    )
-
-    if (!hasUSState) {
-      return 'INTL'
-    }
-
-    return 'OTHER'
-  }
-
-  // Group properties by region
-  const groupedProperties = propertyList.reduce((acc: Record<string, any[]>, property) => {
-    const category = categorizeProperty(property.address || '')
-    if (!acc[category]) {
-      acc[category] = []
-    }
-    acc[category].push(property)
-    return acc
-  }, {})
-
-  // Define display order and labels
-  const regionOrder = ['CA', 'NYC', 'MIA', 'INTL', 'OTHER']
-  const regionLabels: Record<string, string> = {
-    'CA': 'California',
-    'NYC': 'New York',
-    'MIA': 'Miami',
-    'INTL': 'International',
-    'OTHER': 'Other Locations'
-  }
-
   const isClosed = client.status === 'closed'
   const managerFullName = manager?.last_name ? `${manager.name} ${manager.last_name}` : manager?.name
 
@@ -298,44 +241,16 @@ export default async function ClientPublicPage({
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-12 sm:space-y-28">
-            {regionOrder.map((region, regionIndex) => {
-              const properties = groupedProperties[region]
-              if (!properties || properties.length === 0) return null
-
-              return (
-                <section key={region} className="animate-fade-in" style={{ animationDelay: `${regionIndex * 0.1}s` }}>
-                  {/* Elegant Section Header - Mobile Optimized */}
-                  <div className="mb-6 sm:mb-14">
-                    <div className="flex items-center gap-3 sm:gap-6 mb-2 sm:mb-4">
-                      <span className="w-4 sm:w-12 h-px bg-gradient-to-r from-white/30 to-transparent" />
-                      <h2 className="text-xl sm:text-3xl md:text-4xl font-extralight text-white tracking-[0.1em] sm:tracking-[0.2em]">
-                        {regionLabels[region]}
-                      </h2>
-                    </div>
-                    <div className="flex items-center gap-3 sm:gap-6 pl-7 sm:pl-18">
-                      <span className="text-white/40 text-[10px] sm:text-xs tracking-[0.15em] sm:tracking-[0.2em] uppercase">
-                        {properties.length} {properties.length === 1 ? 'Listing' : 'Listings'}
-                      </span>
-                      <span className="flex-1 h-px bg-gradient-to-r from-white/10 to-transparent" />
-                    </div>
-                  </div>
-
-                  {/* Property Grid - Single column on mobile */}
-                  <div className="grid gap-5 sm:gap-10 md:grid-cols-2 lg:grid-cols-3">
-                    {properties.map((property: any, index: number) => (
-                      <div
-                        key={property.id}
-                        className="animate-fade-in"
-                        style={{ animationDelay: `${index * 0.05}s` }}
-                      >
-                        <PublicPropertyCard property={property} clientId={id} />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )
-            })}
+          <div className="grid gap-5 sm:gap-10 md:grid-cols-2 lg:grid-cols-3">
+            {propertyList.map((property: any, index: number) => (
+              <div
+                key={property.id}
+                className="animate-fade-in"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <PublicPropertyCard property={property} clientId={id} />
+              </div>
+            ))}
           </div>
         )}
       </main>
