@@ -6,8 +6,27 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'Luxury Concierge - Cadiz & Lluis',
-  description: 'Luxury concierge services tailored to your every need. Unparalleled experiences and personalized care.',
+  description: 'Discreet access to exceptional experiences, defined by precision and trust. Luxury concierge services tailored to your every need.',
   generator: 'Cadiz & Lluis',
+  openGraph: {
+    title: 'Luxury Concierge - Cadiz & Lluis',
+    description: 'Discreet access to exceptional experiences, defined by precision and trust.',
+    images: [
+      {
+        url: '/example/example2/openGraphCadiz.png',
+        width: 1200,
+        height: 630,
+        alt: 'Cadiz & Lluis - Luxury Concierge',
+      },
+    ],
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Luxury Concierge - Cadiz & Lluis',
+    description: 'Discreet access to exceptional experiences, defined by precision and trust.',
+    images: ['/example/example2/openGraphCadiz.png'],
+  },
   other: {
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'black-translucent',

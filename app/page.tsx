@@ -65,7 +65,6 @@ export default function HomePage() {
             <a href="mailto:brody@cadizlluis.com">
               <button className="inline-flex items-center gap-2 px-8 sm:px-10 py-3.5 sm:py-4 rounded-lg border border-white/[0.15] bg-white/[0.03] text-white/90 hover:bg-white/[0.08] hover:border-white/[0.25] active:bg-white/[0.1] transition-all duration-300 text-sm sm:text-base tracking-wide font-light">
                 Contact Us
-                <Mail className="h-4 w-4" />
               </button>
             </a>
           </div>
