@@ -77,6 +77,14 @@ export default async function AdminClientPage({
 
   const managerProperties = (managerAssignments?.map((a: any) => a.properties).filter(Boolean) || []) as any[]
 
+  // Fetch saved property IDs for this manager
+  const { data: savedPropertiesData } = await supabase
+    .from('saved_properties')
+    .select('property_id')
+    .eq('manager_id', manager.id)
+
+  const savedPropertyIds = savedPropertiesData?.map((s: any) => s.property_id) || []
+
   // Fetch properties already assigned to this client (with client-specific pricing visibility)
   const { data: clientAssignments } = await supabase
     .from('client_property_assignments')
@@ -97,6 +105,11 @@ export default async function AdminClientPage({
     client_show_nightly_rate: a.show_nightly_rate_to_client ?? true,
     client_show_purchase_price: a.show_purchase_price_to_client ?? true,
   })).filter(Boolean) || []) as any[]
+
+  // Get IDs of properties that were scraped specifically for this client (from properties table)
+  const scrapedForClientPropertyIds = managerProperties
+    .filter((p: any) => p.scraped_for_client_id === id)
+    .map((p: any) => p.id)
 
   // Fetch invoices and quotes for this client (by email)
   const [invoicesResult, quotesResult] = await Promise.all([
@@ -383,6 +396,8 @@ export default async function AdminClientPage({
           clientName={client.name}
           managerProperties={managerProperties}
           assignedProperties={clientProperties}
+          savedPropertyIds={savedPropertyIds}
+          scrapedForClientPropertyIds={scrapedForClientPropertyIds}
         />
       </div>
 
