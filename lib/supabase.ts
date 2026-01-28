@@ -18,6 +18,8 @@ export interface Property {
   created_at: string | null
   updated_at: string | null
   position: number | null
+  // Track which client this was scraped for
+  scraped_for_client_id?: string | null
   // Pricing display options
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
@@ -135,6 +137,8 @@ export async function saveProperty(propertyData: {
   agent_phone?: string | null
   agent_email?: string | null
   broker_name?: string | null
+  // Track which client this was scraped for
+  scraped_for_client_id?: string | null
 }) {
   // Allow duplicate zillow_urls - different managers can add the same property with different pricing
   const { data, error } = await supabase

@@ -27,7 +27,7 @@ import {
 } from '@/lib/actions/clients'
 import { createPropertyAndAssignToClient, NewPropertyData } from '@/lib/actions/properties'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil } from 'lucide-react'
+import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil, Star, Globe, Sparkles } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,6 +50,8 @@ type Property = {
   area?: number
   images?: string[]
   position?: number | null
+  zillow_url?: string
+  scraped_for_client_id?: string | null
   // Pricing options (from property)
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
@@ -63,16 +65,22 @@ type Property = {
   client_show_purchase_price?: boolean
 }
 
+type PropertyViewMode = 'all' | 'saved' | 'scraped'
+
 export function ClientPropertyAssignment({
   clientId,
   clientName,
   managerProperties,
   assignedProperties: initialAssignedProperties,
+  savedPropertyIds = [],
+  scrapedForClientPropertyIds = [],
 }: {
   clientId: string
   clientName: string
   managerProperties: Property[]
   assignedProperties: Property[]
+  savedPropertyIds?: string[]
+  scrapedForClientPropertyIds?: string[]
 }) {
   const router = useRouter()
   const { toast } = useToast()
@@ -99,6 +107,9 @@ export function ClientPropertyAssignment({
   // Bulk selection state
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set())
   const [isBulkMode, setIsBulkMode] = useState(false)
+
+  // Property view mode state
+  const [propertyViewMode, setPropertyViewMode] = useState<PropertyViewMode>('all')
 
   // New property modal state
   const [showNewPropertyModal, setShowNewPropertyModal] = useState(false)
@@ -144,7 +155,26 @@ export function ClientPropertyAssignment({
   const assignedIds = new Set(assignedProperties.map((p) => p.id))
   const availableProperties = managerProperties.filter((p) => !assignedIds.has(p.id))
 
-  const filteredAvailable = availableProperties.filter((p) =>
+  // Filter properties based on view mode
+  const getFilteredByViewMode = (properties: Property[]) => {
+    switch (propertyViewMode) {
+      case 'saved':
+        // Only show saved/starred properties that are available (not assigned)
+        return properties.filter((p) => savedPropertyIds.includes(p.id))
+      case 'scraped':
+        // Show properties that were scraped specifically for this client
+        // These are in the available list (not yet assigned)
+        return properties.filter((p) =>
+          scrapedForClientPropertyIds.includes(p.id) || p.scraped_for_client_id === clientId
+        )
+      case 'all':
+      default:
+        return properties
+    }
+  }
+
+  const filteredByMode = getFilteredByViewMode(availableProperties)
+  const filteredAvailable = filteredByMode.filter((p) =>
     p.address?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -713,6 +743,8 @@ export function ClientPropertyAssignment({
         agent_phone: agentPhone,
         agent_email: agentEmail,
         broker_name: brokerName,
+        // Track which client this was scraped for (not auto-assigned)
+        scraped_for_client_id: clientId,
       }
 
       const savedProperty = await saveProperty(newProperty)
@@ -734,36 +766,11 @@ export function ClientPropertyAssignment({
         }
       }
 
-      // Get current manager and assign property
+      // Get current manager and assign property to manager (NOT to client)
       const { data: managerProfile } = await getCurrentManagerProfile()
       if (managerProfile && savedProperty.id) {
         await assignPropertyToManagers(savedProperty.id, [managerProfile.id])
       }
-
-      // Assign to client
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-
-      // Get next position
-      const { data: existingAssignments } = await supabase
-        .from('client_property_assignments')
-        .select('position')
-        .eq('client_id', clientId)
-        .order('position', { ascending: false })
-        .limit(1)
-
-      const nextPosition = existingAssignments && existingAssignments.length > 0
-        ? (existingAssignments[0].position || 0) + 1
-        : 0
-
-      await supabase.from('client_property_assignments').insert({
-        client_id: clientId,
-        property_id: savedProperty.id,
-        position: nextPosition,
-        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
-        show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
-        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
-      })
 
       // Generate AI description
       try {
@@ -784,7 +791,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property scraped and added to client',
+        description: 'Property scraped and ready to add to client',
       })
 
       // Show warning if price was not found
@@ -922,39 +929,17 @@ export function ClientPropertyAssignment({
         // For sales, set purchase price from scraped price
         show_purchase_price: !isRental && scrapedPrice ? true : newPropertyData.show_purchase_price,
         custom_purchase_price: !isRental && scrapedPrice ? scrapedPrice : (newPropertyData.custom_purchase_price || null),
+        // Track which client this was scraped for (not auto-assigned)
+        scraped_for_client_id: clientId,
       }
 
       const savedProperty = await saveProperty(newProperty)
 
-      // Get current manager and assign property
+      // Get current manager and assign property to manager (NOT to client)
       const { data: managerProfile } = await getCurrentManagerProfile()
       if (managerProfile && savedProperty.id) {
         await assignPropertyToManagers(savedProperty.id, [managerProfile.id])
       }
-
-      // Assign to client
-      const { createClient } = await import('@/lib/supabase/client')
-      const supabase = createClient()
-
-      const { data: existingAssignments } = await supabase
-        .from('client_property_assignments')
-        .select('position')
-        .eq('client_id', clientId)
-        .order('position', { ascending: false })
-        .limit(1)
-
-      const nextPosition = existingAssignments && existingAssignments.length > 0
-        ? (existingAssignments[0].position || 0) + 1
-        : 0
-
-      await supabase.from('client_property_assignments').insert({
-        client_id: clientId,
-        property_id: savedProperty.id,
-        position: nextPosition,
-        show_monthly_rent_to_client: isRental && scrapedPrice ? true : (newPropertyData.show_monthly_rent ?? true),
-        show_nightly_rate_to_client: newPropertyData.show_nightly_rate ?? true,
-        show_purchase_price_to_client: !isRental && scrapedPrice ? true : (newPropertyData.show_purchase_price ?? true),
-      })
 
       // Generate AI description
       try {
@@ -975,7 +960,7 @@ export function ClientPropertyAssignment({
 
       toast({
         title: 'Success',
-        description: 'Property created without images',
+        description: 'Property scraped and ready to add to client',
       })
 
       // Show warning if price was not found
@@ -1826,44 +1811,85 @@ export function ClientPropertyAssignment({
         </CardContent>
       </Card>
 
-      {/* Saved Properties Section */}
+      {/* Available Properties Section */}
       <Card className="glass-card border-white/20">
         <CardHeader className="p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-white text-base sm:text-lg">Saved Properties</CardTitle>
-              <CardDescription className="text-white/70 text-xs sm:text-sm">
-                {availableProperties.length} {availableProperties.length === 1 ? 'property' : 'properties'} available
-              </CardDescription>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-white text-base sm:text-lg">
+                  {propertyViewMode === 'scraped' ? 'Scraped for Client' : 'Available Properties'}
+                </CardTitle>
+                <CardDescription className="text-white/70 text-xs sm:text-sm">
+                  {filteredByMode.length} {filteredByMode.length === 1 ? 'property' : 'properties'} {propertyViewMode === 'scraped' ? 'scraped for this client' : 'available'}
+                </CardDescription>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleOpenNewPropertyModal}
+                  className="bg-white text-black hover:bg-white/90 text-xs sm:text-sm h-8 sm:h-9"
+                >
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden sm:inline">New Property</span>
+                  <span className="sm:hidden">New</span>
+                </Button>
+                <Button
+                  size="sm"
+                  variant={isBulkMode ? 'default' : 'outline'}
+                  onClick={toggleBulkMode}
+                  className={`text-xs sm:text-sm h-8 sm:h-9 ${isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}`}
+                >
+                  {isBulkMode ? (
+                    <>
+                      <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Bulk Mode</span>
+                    </>
+                  ) : (
+                    <>
+                      <Square className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Bulk Select</span>
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={handleOpenNewPropertyModal}
-                className="bg-white text-black hover:bg-white/90 text-xs sm:text-sm h-8 sm:h-9"
+
+            {/* View Mode Toggle */}
+            <div className="flex gap-1 p-1 bg-white/5 rounded-lg border border-white/10">
+              <button
+                onClick={() => setPropertyViewMode('all')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                  propertyViewMode === 'all'
+                    ? 'bg-white text-black'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
               >
-                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                <span className="hidden sm:inline">New Property</span>
-                <span className="sm:hidden">New</span>
-              </Button>
-              <Button
-                size="sm"
-                variant={isBulkMode ? 'default' : 'outline'}
-                onClick={toggleBulkMode}
-                className={`text-xs sm:text-sm h-8 sm:h-9 ${isBulkMode ? 'bg-blue-500 hover:bg-blue-600' : 'border-white/30 text-white hover:bg-white/10'}`}
+                <Globe className="h-3.5 w-3.5" />
+                <span>All</span>
+              </button>
+              <button
+                onClick={() => setPropertyViewMode('saved')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                  propertyViewMode === 'saved'
+                    ? 'bg-yellow-500 text-black'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
               >
-                {isBulkMode ? (
-                  <>
-                    <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Bulk Mode</span>
-                  </>
-                ) : (
-                  <>
-                    <Square className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Bulk Select</span>
-                  </>
-                )}
-              </Button>
+                <Star className="h-3.5 w-3.5" />
+                <span>Saved</span>
+              </button>
+              <button
+                onClick={() => setPropertyViewMode('scraped')}
+                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
+                  propertyViewMode === 'scraped'
+                    ? 'bg-purple-500 text-white'
+                    : 'text-white/70 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Scraped</span>
+              </button>
             </div>
           </div>
         </CardHeader>
@@ -1920,13 +1946,28 @@ export function ClientPropertyAssignment({
           <div className="space-y-2 max-h-[400px] sm:max-h-[600px] overflow-y-auto">
             {filteredAvailable.length === 0 ? (
               <div className="text-center py-8 sm:py-12">
-                <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
-                <p className="text-white/60 text-sm sm:text-base">
-                  {searchQuery ? 'No properties match your search' : 'All properties have been assigned'}
-                </p>
+                {propertyViewMode === 'scraped' ? (
+                  <>
+                    <Sparkles className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
+                    <p className="text-white/60 text-sm sm:text-base">
+                      {searchQuery ? 'No properties match your search' : 'No properties have been scraped for this client yet'}
+                    </p>
+                    <p className="text-white/40 text-xs mt-2">
+                      Use the &quot;New Property&quot; button and scrape from Zillow to add properties for this client
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <Home className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-3 text-white/30" />
+                    <p className="text-white/60 text-sm sm:text-base">
+                      {searchQuery ? 'No properties match your search' :
+                       propertyViewMode === 'saved' ? 'No saved properties available' : 'All properties have been assigned'}
+                    </p>
+                  </>
+                )}
               </div>
             ) : (
-              filteredAvailable.map((property) => {
+                filteredAvailable.map((property) => {
                 const firstImage = property.images && property.images.length > 0 ? property.images[0] : null
                 const isSelected = selectedProperties.has(property.id)
 

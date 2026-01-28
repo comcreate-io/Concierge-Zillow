@@ -228,12 +228,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  serviceImage: {
-    width: 120,
-    height: 80,
+  serviceImageContainer: {
+    width: 150,
+    height: 100,
     borderRadius: 4,
     marginRight: 8,
     marginBottom: 8,
+    overflow: 'hidden',
+  },
+  serviceImage: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
   },
   // Totals
   totalsSection: {
@@ -527,31 +533,17 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
               {item.images && item.images.length > 0 && (
                 <View style={styles.serviceImages}>
                   {item.images.slice(0, 3).map((imageUrl, imgIndex) => (
-                    <Image
-                      key={imgIndex}
-                      src={imageUrl}
-                      style={styles.serviceImage}
-                    />
+                    <View key={imgIndex} style={styles.serviceImageContainer}>
+                      <Image
+                        src={imageUrl}
+                        style={styles.serviceImage}
+                      />
+                    </View>
                   ))}
                 </View>
               )}
             </View>
           ))}
-        </View>
-
-        {/* Totals */}
-        <View style={styles.totalsSection}>
-          <View style={styles.totalsBox}>
-            <View style={styles.totalsRow}>
-              <Text style={styles.totalsLabel}>Subtotal</Text>
-              <Text style={styles.totalsValue}>{formatCurrency(quote.subtotal)}</Text>
-            </View>
-            <View style={styles.totalsDivider} />
-            <View style={styles.grandTotalRow}>
-              <Text style={styles.grandTotalLabel}>Total</Text>
-              <Text style={styles.grandTotalValue}>{formatCurrency(quote.total)}</Text>
-            </View>
-          </View>
         </View>
 
         {/* Expiration Notice */}
