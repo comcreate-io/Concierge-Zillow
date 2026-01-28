@@ -190,12 +190,16 @@ const styles = StyleSheet.create({
   // Image section
   imageContainer: {
     position: 'relative',
+    width: 220,
     height: 140,
+    overflow: 'hidden',
   },
   serviceImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 220,
+    height: 'auto',
   },
   // Badge overlay on image
   nameBadge: {
@@ -587,10 +591,18 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
   },
   // Yacht main image
-  yachtMainImage: {
-    width: '100%',
+  yachtMainImageContainer: {
+    position: 'relative',
+    width: 535,
     height: 220,
-    objectFit: 'cover',
+    overflow: 'hidden',
+  },
+  yachtMainImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 535,
+    height: 'auto',
   },
   // Description banner
   yachtDescBanner: {
@@ -660,11 +672,19 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 4,
   },
-  yachtSecondaryImage: {
-    width: '100%',
+  yachtSecondaryImageContainer: {
+    position: 'relative',
+    width: 220,
     height: 150,
-    objectFit: 'cover',
     borderRadius: 8,
+    overflow: 'hidden',
+  },
+  yachtSecondaryImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 220,
+    height: 'auto',
   },
   yachtImageContainer: {
     position: 'relative',
@@ -959,13 +979,16 @@ const styles = StyleSheet.create({
   // Car main image with label overlay
   carImageContainer: {
     position: 'relative',
-    width: '100%',
+    width: 595,
     height: 280,
+    overflow: 'hidden',
   },
   carMainImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 595,
+    height: 'auto',
   },
   carImageLabel: {
     position: 'absolute',
@@ -1025,11 +1048,19 @@ const styles = StyleSheet.create({
   carContentRight: {
     width: 220,
   },
-  carSecondaryImage: {
-    width: '100%',
+  carSecondaryImageContainer: {
+    position: 'relative',
+    width: 220,
     height: 180,
-    objectFit: 'cover',
     marginBottom: 20,
+    overflow: 'hidden',
+  },
+  carSecondaryImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 220,
+    height: 'auto',
   },
   // Car price box
   carPriceBox: {
@@ -1246,7 +1277,9 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
 
                   {/* Main Yacht Image */}
                   {displayImages[0] && (
-                    <Image src={displayImages[0]} style={styles.yachtMainImage} />
+                    <View style={styles.yachtMainImageContainer}>
+                      <Image src={displayImages[0]} style={styles.yachtMainImage} />
+                    </View>
                   )}
 
                   {/* Description Banner */}
@@ -1300,7 +1333,9 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
                     {/* Right Column - Secondary Image and Price */}
                     <View style={styles.yachtDetailsRight}>
                       {displayImages[1] && (
-                        <Image src={displayImages[1]} style={styles.yachtSecondaryImage} />
+                        <View style={styles.yachtSecondaryImageContainer}>
+                          <Image src={displayImages[1]} style={styles.yachtSecondaryImage} />
+                        </View>
                       )}
 
                       {/* Price Below Image */}
@@ -1448,7 +1483,9 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
                     {/* Right Column - Image and Price */}
                     <View style={styles.carContentRight}>
                       {displayImages[1] && (
-                        <Image src={displayImages[1]} style={styles.carSecondaryImage} />
+                        <View style={styles.carSecondaryImageContainer}>
+                          <Image src={displayImages[1]} style={styles.carSecondaryImage} />
+                        </View>
                       )}
 
                       {/* Price Box */}

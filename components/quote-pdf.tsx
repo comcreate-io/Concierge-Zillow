@@ -231,15 +231,14 @@ const styles = StyleSheet.create({
   serviceImageContainer: {
     width: 150,
     height: 100,
-    borderRadius: 4,
     marginRight: 8,
     marginBottom: 8,
+    borderRadius: 4,
     overflow: 'hidden',
   },
   serviceImage: {
-    width: '100%',
-    height: '100%',
-    objectFit: 'cover',
+    minWidth: 150,
+    minHeight: 100,
   },
   // Totals
   totalsSection: {
