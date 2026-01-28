@@ -441,31 +441,49 @@ export function QuotePDFBuilderDialog({
           // Handle different image types separately
           const isHeaderBg = img.alt === 'Header'
           const isLogo = img.alt === 'Cadiz & Lluis'
-          const isYachtImage = img.alt === 'Yacht' || img.alt === 'Yacht Interior'
+          const isInteriorImage = img.alt === 'Aircraft Interior' || img.alt === 'Car Interior' || img.alt === 'Yacht Interior' || img.alt === 'Yacht'
 
-          if (isHeaderBg) {
-            // Header background: simulate object-fit cover (this works great)
+          if (isHeaderBg || isInteriorImage) {
+            // Simulate object-fit cover for these images
             const parent = img.parentElement
             if (parent) {
               const parentRect = parent.getBoundingClientRect()
               const imgNaturalWidth = img.naturalWidth || img.width
               const imgNaturalHeight = img.naturalHeight || img.height
 
-              if (imgNaturalWidth && imgNaturalHeight) {
+              if (imgNaturalWidth && imgNaturalHeight && parentRect.width > 0 && parentRect.height > 0) {
                 const parentAspect = parentRect.width / parentRect.height
                 const imgAspect = imgNaturalWidth / imgNaturalHeight
 
+                // Calculate dimensions to cover the container while maintaining aspect ratio
+                let newWidth, newHeight
+
                 if (imgAspect > parentAspect) {
-                  // Image is wider - fit by height
-                  img.style.width = 'auto'
-                  img.style.height = '100%'
-                  img.style.maxWidth = 'none'
+                  // Image is wider than container - fit by height, crop sides
+                  newHeight = parentRect.height
+                  newWidth = newHeight * imgAspect
                 } else {
-                  // Image is taller - fit by width
-                  img.style.width = '100%'
-                  img.style.height = 'auto'
-                  img.style.maxHeight = 'none'
+                  // Image is taller than container - fit by width, crop top/bottom
+                  newWidth = parentRect.width
+                  newHeight = newWidth / imgAspect
                 }
+
+                // Center the image
+                const offsetX = (parentRect.width - newWidth) / 2
+                const offsetY = (parentRect.height - newHeight) / 2
+
+                img.style.position = 'absolute'
+                img.style.width = newWidth + 'px'
+                img.style.height = newHeight + 'px'
+                img.style.left = offsetX + 'px'
+                img.style.top = offsetY + 'px'
+                img.style.maxWidth = 'none'
+                img.style.maxHeight = 'none'
+                img.style.objectFit = 'none'
+
+                // Ensure parent has position relative and overflow hidden
+                parent.style.position = 'relative'
+                parent.style.overflow = 'hidden'
               }
             }
           } else if (isLogo) {
@@ -485,9 +503,6 @@ export function QuotePDFBuilderDialog({
               img.style.minWidth = 'auto'
               img.style.minHeight = 'auto'
             }
-          } else if (isYachtImage) {
-            // Yacht images: don't modify at all, let them render naturally
-            // Just keep them as-is
           }
         }
       })
