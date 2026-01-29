@@ -1,13 +1,11 @@
 import { QuotesList } from '@/components/quotes-list'
 import { getAllQuotesSystem } from '@/lib/actions/quotes'
 import { getAllManagers } from '@/lib/actions/clients'
-import { isSuperAdmin } from '@/lib/auth/roles'
 
 export default async function QuotesPage() {
-  const [quotesResult, managersResult, isAdmin] = await Promise.all([
+  const [quotesResult, managersResult] = await Promise.all([
     getAllQuotesSystem(),
-    getAllManagers(),
-    isSuperAdmin()
+    getAllManagers()
   ])
 
   if (quotesResult.error) {
@@ -29,7 +27,7 @@ export default async function QuotesPage() {
         quotes={quotesResult.data || []}
         managers={managersResult.data || []}
         showManagerFilter={true}
-        isAdmin={isAdmin}
+        isAdmin={true}
       />
     </div>
   )
