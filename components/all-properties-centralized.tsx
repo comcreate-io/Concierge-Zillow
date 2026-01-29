@@ -102,14 +102,11 @@ export function AllPropertiesCentralized({
     return map
   }, [assignments])
 
-  // Filter properties based on search (exclude client-specific scraped properties)
+  // Filter properties based on search
   const filteredProperties = useMemo(() => {
-    // First, filter out properties scraped for specific clients
-    let filtered = properties.filter((p) => !p.scraped_for_client_id)
-
-    if (!searchQuery) return filtered
+    if (!searchQuery) return properties
     const query = searchQuery.toLowerCase()
-    return filtered.filter((p) =>
+    return properties.filter((p) =>
       p.address?.toLowerCase().includes(query) ||
       p.bedrooms?.toString().includes(query) ||
       p.bathrooms?.toString().includes(query)
