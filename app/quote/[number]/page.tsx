@@ -820,16 +820,6 @@ export default function QuoteViewPage() {
           })}
         </div>
 
-        {/* Total */}
-        <Card className="glass-card-accent elevated-card border border-white/20 mb-8">
-          <CardContent className="p-6">
-            <div className="flex justify-between items-center">
-              <span className="text-white text-xl font-semibold">Total</span>
-              <span className="text-white text-3xl font-bold">{formatCurrency(quote.total)}</span>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Notes */}
         {quote.notes && (
           <Card className="glass-card-accent elevated-card border border-white/20 mb-8">
