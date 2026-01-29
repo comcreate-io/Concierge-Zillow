@@ -74,6 +74,8 @@ export type PDFCustomization = {
   service_overrides?: {
     [serviceItemId: string]: ServiceOverride
   }
+  // Hidden service items (admin only) - IDs of items to exclude from PDF
+  hidden_service_items?: string[]
   custom_notes?: string
   custom_terms?: string
   accent_color?: string

@@ -39,6 +39,7 @@ interface QuotePDFBuilderDialogProps {
   isOpen: boolean
   onClose: () => void
   onSave?: (customization: PDFCustomization) => void
+  isAdmin?: boolean
 }
 
 interface ServiceOverrideState extends ServiceOverride {
@@ -50,6 +51,7 @@ export function QuotePDFBuilderDialog({
   isOpen,
   onClose,
   onSave,
+  isAdmin = false,
 }: QuotePDFBuilderDialogProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -78,6 +80,9 @@ export function QuotePDFBuilderDialog({
   const [customNotes, setCustomNotes] = useState('')
   const [customTerms, setCustomTerms] = useState('')
 
+  // Hidden service items (admin only) - stores IDs of items to exclude from PDF
+  const [hiddenServiceItems, setHiddenServiceItems] = useState<Set<string>>(new Set())
+
   // Initialize state from existing customization
   useEffect(() => {
     if (isOpen && quote) {
@@ -94,6 +99,9 @@ export function QuotePDFBuilderDialog({
       setArrivalCode(existing?.route?.arrival_code || '')
       setArrivalCity(existing?.route?.arrival_city || '')
 
+      // Initialize hidden service items
+      setHiddenServiceItems(new Set(existing?.hidden_service_items || []))
+
       // Initialize service overrides
       const overrides: { [key: string]: ServiceOverrideState } = {}
       quote.service_items.forEach((item, index) => {
@@ -108,6 +116,7 @@ export function QuotePDFBuilderDialog({
           passengers: existingOverride?.passengers || '',
           flight_time: existingOverride?.flight_time || '',
           services_list: existingOverride?.services_list || (headerIcon === 'yacht' ? ['Crew & amenities', 'Catering & beverages'] : ['Crew & in-flight refreshments', 'VIP handling & concierge coordination']),
+          price_override: existingOverride?.price_override,
           expanded: index === 0, // First item expanded by default
         }
       })
@@ -136,6 +145,7 @@ export function QuotePDFBuilderDialog({
         arrival_city: arrivalCity || undefined,
       } : undefined,
       service_overrides: Object.keys(serviceOverridesClean).length > 0 ? serviceOverridesClean : undefined,
+      hidden_service_items: hiddenServiceItems.size > 0 ? Array.from(hiddenServiceItems) : undefined,
       custom_notes: customNotes || undefined,
       custom_terms: customTerms || undefined,
     }
@@ -186,6 +196,7 @@ export function QuotePDFBuilderDialog({
     setArrivalCity('')
     setCustomNotes(quote.notes || '')
     setCustomTerms('')
+    setHiddenServiceItems(new Set())
 
     const overrides: { [key: string]: ServiceOverrideState } = {}
     quote.service_items.forEach((item, index) => {
@@ -198,6 +209,7 @@ export function QuotePDFBuilderDialog({
         passengers: '',
         flight_time: '',
         services_list: headerIcon === 'yacht' ? ['Crew & amenities', 'Catering & beverages'] : ['Crew & in-flight refreshments', 'VIP handling & concierge coordination'],
+        price_override: undefined,
         expanded: index === 0,
       }
     })
@@ -738,6 +750,19 @@ export function QuotePDFBuilderDialog({
     }))
   }
 
+  // Toggle service item visibility (admin only)
+  const toggleServiceItemVisibility = (serviceId: string) => {
+    setHiddenServiceItems(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(serviceId)) {
+        newSet.delete(serviceId)
+      } else {
+        newSet.add(serviceId)
+      }
+      return newSet
+    })
+  }
+
   // Handle image upload to Cloudinary
   const handleImageUpload = async (serviceId: string, files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -954,34 +979,57 @@ export function QuotePDFBuilderDialog({
                 {quote.service_items.map((item, index) => {
                   const override = serviceOverrides[item.id] || {}
                   const isExpanded = override.expanded
+                  const isHidden = hiddenServiceItems.has(item.id)
 
                   return (
                     <div
                       key={item.id}
-                      className="p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10"
+                      className={`p-3 sm:p-4 glass-card-accent rounded-xl border ${isHidden ? 'border-red-500/30 bg-red-500/5' : 'border-white/10'}`}
                     >
                       {/* Collapsed Header */}
-                      <button
-                        type="button"
-                        onClick={() => toggleServiceExpanded(item.id)}
-                        className="w-full flex items-center justify-between text-left gap-2"
-                      >
-                        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-                          <span className="bg-white/20 text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0">
-                            {String(index + 1).padStart(2, '0')}
-                          </span>
-                          <span className="text-white font-medium text-sm sm:text-base truncate">
-                            {override.display_name || item.service_name}
-                            {override.jet_model && <span className="text-white/60 ml-1 hidden sm:inline">{override.jet_model}</span>}
-                          </span>
-                          <span className="text-white/70 text-xs sm:text-sm shrink-0">{formatCurrency(override.price_override ?? item.price)}</span>
-                        </div>
-                        {isExpanded ? (
-                          <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
-                        ) : (
-                          <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => toggleServiceExpanded(item.id)}
+                          className="flex-1 flex items-center justify-between text-left gap-2"
+                        >
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                            <span className={`text-white text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded shrink-0 ${isHidden ? 'bg-red-500/30' : 'bg-white/20'}`}>
+                              {String(index + 1).padStart(2, '0')}
+                            </span>
+                            <span className={`font-medium text-sm sm:text-base truncate ${isHidden ? 'text-white/40 line-through' : 'text-white'}`}>
+                              {override.display_name || item.service_name}
+                              {override.jet_model && <span className="text-white/60 ml-1 hidden sm:inline">{override.jet_model}</span>}
+                            </span>
+                            <span className={`text-xs sm:text-sm shrink-0 ${isHidden ? 'text-white/40 line-through' : 'text-white/70'}`}>{formatCurrency(override.price_override ?? item.price)}</span>
+                            {isHidden && <span className="text-red-400 text-[10px] sm:text-xs">(Hidden)</span>}
+                          </div>
+                          {isExpanded ? (
+                            <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-white/50 shrink-0" />
+                          )}
+                        </button>
+                        {/* Admin Delete/Restore Button */}
+                        {isAdmin && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleServiceItemVisibility(item.id)}
+                            className={`shrink-0 h-8 w-8 ${isHidden
+                              ? 'text-green-400 hover:text-green-300 hover:bg-green-500/10'
+                              : 'text-red-400 hover:text-red-300 hover:bg-red-500/10'}`}
+                            title={isHidden ? 'Restore item' : 'Remove item from PDF'}
+                          >
+                            {isHidden ? (
+                              <RotateCcw className="h-4 w-4" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
                         )}
-                      </button>
+                      </div>
 
                       {/* Expanded Content */}
                       {isExpanded && (
@@ -1199,16 +1247,21 @@ export function QuotePDFBuilderDialog({
                             </div>
                           )}
 
-                          {/* Price (Read-only) */}
+                          {/* Price */}
                           <div className="space-y-2">
-                            <Label className="text-white/90 text-sm">Price</Label>
+                            <Label className="text-white/90 text-sm">
+                              Price {!isAdmin && <span className="text-white/40 text-xs">(Read-only)</span>}
+                            </Label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
+                              <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${isAdmin ? 'text-white/70' : 'text-white/40'}`}>$</span>
                               <Input
                                 type="number"
                                 value={override.price_override ?? item.price}
-                                readOnly
-                                className="bg-white/5 border-white/10 text-white/60 pl-7 cursor-not-allowed"
+                                onChange={(e) => isAdmin && updateServiceOverride(item.id, 'price_override', parseFloat(e.target.value) || 0)}
+                                readOnly={!isAdmin}
+                                className={`pl-7 ${isAdmin
+                                  ? 'bg-white/5 border-white/20 text-white'
+                                  : 'bg-white/5 border-white/10 text-white/60 cursor-not-allowed'}`}
                               />
                             </div>
                           </div>
@@ -1301,8 +1354,8 @@ export function QuotePDFBuilderDialog({
                     {/* Dotted Line */}
                     <div style={{ borderBottom: '1px dashed #d1d5db', margin: '10px 50px' }}></div>
 
-                    {/* Loop through yacht service items (max 5) */}
-                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+                    {/* Loop through yacht service items (max 5, excluding hidden) */}
+                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
                       if (!item) return null
 
                       const override = serviceOverrides[item.id] || {}
@@ -1473,8 +1526,8 @@ export function QuotePDFBuilderDialog({
                       </div>
                     </div>
 
-                    {/* Loop through car service items (max 5) */}
-                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+                    {/* Loop through car service items (max 5, excluding hidden) */}
+                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
                       if (!item) return null
                       const override = serviceOverrides[item.id] || {}
                       const images = item.images || []
@@ -1672,8 +1725,8 @@ export function QuotePDFBuilderDialog({
                     )}
                   </div>
 
-                  {/* Aircraft Options */}
-                  {quote.service_items.map((item, index) => {
+                  {/* Aircraft Options (excluding hidden) */}
+                  {quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).map((item, index) => {
                     const override = serviceOverrides[item.id] || {}
                     const displayImages = override.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
                     const displayName = override.display_name || item.service_name
