@@ -178,7 +178,7 @@ export function QuotePDFBuilderDialog({
       console.error('Error saving customization:', error)
       toast({
         title: 'Error',
-        description: 'Failed to save customization. Please try again.',
+        description: error instanceof Error ? error.message : 'Failed to save customization. Please try again.',
         variant: 'destructive',
       })
     } finally {
