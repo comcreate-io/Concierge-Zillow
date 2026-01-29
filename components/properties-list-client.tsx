@@ -566,11 +566,7 @@ export function PropertiesListClient({ initialProperties, managers, assignments,
 
     // Filter by view mode
     if (viewMode === 'saved') {
-      // Saved view shows ALL saved properties (including those scraped for clients)
       filtered = filtered.filter(p => savedPropertyIds.includes(p.id))
-    } else {
-      // Default view: filter out properties that were scraped for a specific client
-      filtered = filtered.filter(p => !p.scraped_for_client_id)
     }
 
     // Filter by search query
