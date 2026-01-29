@@ -1256,8 +1256,14 @@ export function QuotePDFBuilderDialog({
                               <span className={`absolute left-3 top-1/2 -translate-y-1/2 ${isAdmin ? 'text-white/70' : 'text-white/40'}`}>$</span>
                               <Input
                                 type="number"
-                                value={override.price_override ?? item.price}
-                                onChange={(e) => isAdmin && updateServiceOverride(item.id, 'price_override', parseFloat(e.target.value) || 0)}
+                                defaultValue={override.price_override ?? item.price}
+                                key={`price-${item.id}-${override.price_override ?? item.price}`}
+                                onBlur={(e) => {
+                                  if (!isAdmin) return
+                                  const val = e.target.value
+                                  const numVal = parseFloat(val)
+                                  updateServiceOverride(item.id, 'price_override', isNaN(numVal) ? 0 : numVal)
+                                }}
                                 readOnly={!isAdmin}
                                 className={`pl-7 ${isAdmin
                                   ? 'bg-white/5 border-white/20 text-white'
