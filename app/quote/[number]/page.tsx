@@ -623,7 +623,9 @@ export default function QuoteViewPage() {
 
         {/* Service Items */}
         <div className="space-y-6 mb-8">
-          {quote.service_items.map((item, itemIndex) => {
+          {quote.service_items
+            .filter(item => !quote.pdf_customization?.hidden_service_items?.includes(item.id))
+            .map((item, itemIndex) => {
             const override = quote.pdf_customization?.service_overrides?.[item.id]
             const details = override?.details || []
             const headerIcon = quote.pdf_customization?.header_icon || 'plane'
@@ -682,7 +684,7 @@ export default function QuoteViewPage() {
                           <p className="text-white/70 whitespace-pre-wrap">{displayDescription}</p>
                         )}
                       </div>
-                      <p className="text-white text-2xl font-bold">{formatCurrency(item.price)}</p>
+                      <p className="text-white text-2xl font-bold">{formatCurrency(override?.price_override ?? item.price)}</p>
                     </div>
 
                     {/* Date */}
@@ -1056,8 +1058,10 @@ export default function QuoteViewPage() {
             {/* Dotted Line */}
             <div style={{ borderBottom: '1px dashed #d1d5db', margin: '10px 50px' }}></div>
 
-            {/* Loop through yacht service items (max 5) */}
-            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+            {/* Loop through yacht service items (max 5, excluding hidden) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items
+              .filter(item => !quote.pdf_customization?.hidden_service_items?.includes(item.id))
+              .slice(0, 5).map((item, idx) => {
               if (!item) return null
               const override = quote.pdf_customization?.service_overrides?.[item.id] || {}
               const images = item.images || []
@@ -1130,7 +1134,7 @@ export default function QuoteViewPage() {
                       {/* Price in Left Column */}
                       <div style={{ marginTop: '24px' }}>
                         <p style={{ fontSize: '36px', fontWeight: 700, color: '#1a1a1a', marginBottom: '6px' }}>
-                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override.price_override ?? item.price)}
                         </p>
                         <p style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>PRICE</p>
                       </div>
@@ -1224,8 +1228,10 @@ export default function QuoteViewPage() {
               </div>
             </div>
 
-            {/* Loop through car service items (max 5) */}
-            {quote.service_items && quote.service_items.length > 0 && quote.service_items.slice(0, 5).map((item, idx) => {
+            {/* Loop through car service items (max 5, excluding hidden) */}
+            {quote.service_items && quote.service_items.length > 0 && quote.service_items
+              .filter(item => !quote.pdf_customization?.hidden_service_items?.includes(item.id))
+              .slice(0, 5).map((item, idx) => {
               if (!item) return null
               const override = quote.pdf_customization?.service_overrides?.[item.id] || {}
               const images = item.images || []
@@ -1299,7 +1305,7 @@ export default function QuoteViewPage() {
                       {/* Price Box */}
                       <div style={{ backgroundColor: '#f9fafb', padding: '20px', textAlign: 'center' }}>
                         <p style={{ fontSize: '32px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px' }}>
-                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(item.price)}
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override.price_override ?? item.price)}
                         </p>
                         <p style={{ fontSize: '9px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px' }}>TOTAL</p>
                       </div>
@@ -1423,8 +1429,10 @@ export default function QuoteViewPage() {
             )}
           </div>
 
-          {/* Aircraft Options */}
-          {quote.service_items.map((item, index) => {
+          {/* Aircraft Options (excluding hidden) */}
+          {quote.service_items
+            .filter(item => !quote.pdf_customization?.hidden_service_items?.includes(item.id))
+            .map((item, index) => {
             const override = quote.pdf_customization?.service_overrides?.[item.id]
             const displayImages = override?.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
             const displayName = override?.display_name || item.service_name
