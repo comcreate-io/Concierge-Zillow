@@ -633,29 +633,36 @@ export default function QuoteViewPage() {
             const headerIcon = quote.pdf_customization?.header_icon || 'plane'
             const displayName = override?.display_name || item.service_name
             const displayDescription = override?.display_description || item.description || ''
+            const displayImages = override?.display_images?.length ? override.display_images : item.images || []
 
-            // Extract common details
+            // Jet-specific fields from override
+            const jetModel = override?.jet_model || ''
+            const passengersOverride = override?.passengers || ''
+            const flightTime = override?.flight_time || ''
+            const servicesList = override?.services_list || []
+
+            // Extract common details from details array (fallback)
             const dateDetail = details.find(d => d.label === 'Date')?.value || ''
-            const departureCode = details.find(d => d.label === 'Departure Code')?.value || ''
-            const departureDetail = details.find(d => d.label === 'Departure')?.value || ''
-            const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || ''
-            const arrivalDetail = details.find(d => d.label === 'Arrival')?.value || ''
-            const duration = details.find(d => d.label === 'Duration')?.value || ''
-            const passengers = details.find(d => d.label === 'Passengers')?.value || ''
-            const departureMarina = details.find(d => d.label === 'Departure Marina')?.value || ''
-            const destination = details.find(d => d.label === 'Destination')?.value || ''
-            const guests = details.find(d => d.label === 'Guests')?.value || ''
-            const pickup = details.find(d => d.label === 'Pickup')?.value || ''
-            const dropoff = details.find(d => d.label === 'Dropoff')?.value || ''
+            const departureCode = details.find(d => d.label === 'Departure Code')?.value || quote.pdf_customization?.route?.departure_code || ''
+            const departureDetail = details.find(d => d.label === 'Departure')?.value || quote.pdf_customization?.route?.departure_city || ''
+            const arrivalCode = details.find(d => d.label === 'Arrival Code')?.value || quote.pdf_customization?.route?.arrival_code || ''
+            const arrivalDetail = details.find(d => d.label === 'Arrival')?.value || quote.pdf_customization?.route?.arrival_city || ''
+            const duration = details.find(d => d.label === 'Duration')?.value || flightTime || ''
+            const passengers = details.find(d => d.label === 'Passengers')?.value || passengersOverride || ''
+            const departureMarina = details.find(d => d.label === 'Departure Marina')?.value || override?.departure_city || ''
+            const destination = details.find(d => d.label === 'Destination')?.value || override?.arrival_city || ''
+            const guests = details.find(d => d.label === 'Guests')?.value || passengersOverride || ''
+            const pickup = details.find(d => d.label === 'Pickup')?.value || override?.departure_city || ''
+            const dropoff = details.find(d => d.label === 'Dropoff')?.value || override?.arrival_city || ''
 
             return (
               <Card key={item.id} className="glass-card-accent elevated-card border border-white/20 overflow-hidden">
                 <CardContent className="p-0">
                   {/* Item Images */}
-                  {item.images && item.images.length > 0 && (
+                  {displayImages && displayImages.length > 0 && (
                     <div className="relative">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-                        {item.images.slice(0, 4).map((imageUrl, imgIndex) => (
+                        {displayImages.slice(0, 4).map((imageUrl, imgIndex) => (
                           <div
                             key={imgIndex}
                             className="aspect-[4/3] cursor-pointer relative overflow-hidden"
@@ -663,12 +670,12 @@ export default function QuoteViewPage() {
                           >
                             <img
                               src={imageUrl}
-                              alt={`${item.service_name} photo ${imgIndex + 1}`}
+                              alt={`${displayName} photo ${imgIndex + 1}`}
                               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                             />
-                            {imgIndex === 3 && item.images.length > 4 && (
+                            {imgIndex === 3 && displayImages.length > 4 && (
                               <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                <span className="text-white text-lg font-semibold">+{item.images.length - 4}</span>
+                                <span className="text-white text-lg font-semibold">+{displayImages.length - 4}</span>
                               </div>
                             )}
                           </div>
@@ -722,10 +729,42 @@ export default function QuoteViewPage() {
                             <p className="text-sm text-white/60">{arrivalDetail || 'Arrival'}</p>
                           </div>
                         </div>
-                        {passengers && (
-                          <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t border-white/10">
-                            <Users className="h-4 w-4 text-white/60" />
-                            <span className="text-white/80">{passengers} Passengers</span>
+                        {(passengers || flightTime) && (
+                          <div className="flex items-center justify-center gap-4 mt-4 pt-4 border-t border-white/10">
+                            {passengers && (
+                              <div className="flex items-center gap-2">
+                                <Users className="h-4 w-4 text-white/60" />
+                                <span className="text-white/80">{passengers} Passengers</span>
+                              </div>
+                            )}
+                            {flightTime && (
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-white/60" />
+                                <span className="text-white/80">{flightTime}</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Jet Model & Services */}
+                    {headerIcon === 'plane' && (jetModel || servicesList.length > 0) && (
+                      <div className="bg-white/5 rounded-xl p-4 mb-4 border border-white/10">
+                        {jetModel && (
+                          <div className="mb-3">
+                            <p className="text-xs text-white/50 uppercase tracking-wider mb-1">Aircraft Model</p>
+                            <p className="text-white font-medium">{jetModel}</p>
+                          </div>
+                        )}
+                        {servicesList.length > 0 && (
+                          <div>
+                            <p className="text-xs text-white/50 uppercase tracking-wider mb-2">Services Included</p>
+                            <div className="space-y-1">
+                              {servicesList.filter(s => s).map((service, sIdx) => (
+                                <p key={sIdx} className="text-white/80 text-sm">• {service}</p>
+                              ))}
+                            </div>
                           </div>
                         )}
                       </div>
