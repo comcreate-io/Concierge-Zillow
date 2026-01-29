@@ -1199,17 +1199,16 @@ export function QuotePDFBuilderDialog({
                             </div>
                           )}
 
-                          {/* Price Override */}
+                          {/* Price (Read-only) */}
                           <div className="space-y-2">
                             <Label className="text-white/90 text-sm">Price</Label>
                             <div className="relative">
-                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">$</span>
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">$</span>
                               <Input
                                 type="number"
                                 value={override.price_override ?? item.price}
-                                onChange={(e) => updateServiceOverride(item.id, 'price_override', e.target.value ? Number(e.target.value) : undefined)}
-                                placeholder={item.price.toString()}
-                                className="bg-white/5 border-white/20 text-white placeholder:text-white/40 pl-7"
+                                readOnly
+                                className="bg-white/5 border-white/10 text-white/60 pl-7 cursor-not-allowed"
                               />
                             </div>
                           </div>
