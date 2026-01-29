@@ -36,7 +36,8 @@ export function PropertyAssignment({
   const [isAssigning, setIsAssigning] = useState<string | null>(null)
 
   const assignedIds = new Set(assignedProperties.map((p) => p.id))
-  const availableProperties = allProperties.filter((p) => !assignedIds.has(p.id))
+  // Filter out properties scraped for specific clients and already assigned properties
+  const availableProperties = allProperties.filter((p) => !assignedIds.has(p.id) && !p.scraped_for_client_id)
 
   const filteredAvailable = availableProperties.filter((p) =>
     p.address?.toLowerCase().includes(searchQuery.toLowerCase())

@@ -49,6 +49,7 @@ type Property = {
   bathrooms?: string | null
   area?: string | null
   images?: string[] | null
+  scraped_for_client_id?: string | null
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
   show_nightly_rate?: boolean
@@ -101,11 +102,14 @@ export function AllPropertiesCentralized({
     return map
   }, [assignments])
 
-  // Filter properties based on search
+  // Filter properties based on search (exclude client-specific scraped properties)
   const filteredProperties = useMemo(() => {
-    if (!searchQuery) return properties
+    // First, filter out properties scraped for specific clients
+    let filtered = properties.filter((p) => !p.scraped_for_client_id)
+
+    if (!searchQuery) return filtered
     const query = searchQuery.toLowerCase()
-    return properties.filter((p) =>
+    return filtered.filter((p) =>
       p.address?.toLowerCase().includes(query) ||
       p.bedrooms?.toString().includes(query) ||
       p.bathrooms?.toString().includes(query)

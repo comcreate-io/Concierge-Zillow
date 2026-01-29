@@ -24,6 +24,7 @@ interface Property {
   created_at: string | null
   managers?: PropertyManager[]
   position?: number | null
+  scraped_for_client_id?: string | null
   // Pricing display options
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
@@ -546,6 +547,7 @@ export function PropertiesListClient({ initialProperties, managers, assignments,
         created_at: prop.created_at,
         managers: propManagers,
         position: prop.position,
+        scraped_for_client_id: prop.scraped_for_client_id,
         // Pricing display options
         show_monthly_rent: prop.show_monthly_rent || false,
         custom_monthly_rent: prop.custom_monthly_rent || null,
@@ -560,7 +562,8 @@ export function PropertiesListClient({ initialProperties, managers, assignments,
   }, [initialProperties, managers, assignments])
 
   const filteredProperties = useMemo(() => {
-    let filtered = properties
+    // First, filter out properties that were scraped for a specific client
+    let filtered = properties.filter(p => !p.scraped_for_client_id)
 
     // Filter by view mode
     if (viewMode === 'saved') {

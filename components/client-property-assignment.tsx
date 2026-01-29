@@ -27,7 +27,7 @@ import {
 } from '@/lib/actions/clients'
 import { createPropertyAndAssignToClient, NewPropertyData } from '@/lib/actions/properties'
 import { Textarea } from '@/components/ui/textarea'
-import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil, Star, Globe, Sparkles } from 'lucide-react'
+import { Search, Home, Plus, X, Loader2, Settings, Check, GripVertical, ChevronUp, ChevronDown, CheckSquare, Square, DollarSign, Link2, Edit3, ImageOff, MoreVertical, Pencil, Star, Sparkles } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,7 +65,7 @@ type Property = {
   client_show_purchase_price?: boolean
 }
 
-type PropertyViewMode = 'all' | 'saved' | 'scraped'
+type PropertyViewMode = 'scraped' | 'saved'
 
 export function ClientPropertyAssignment({
   clientId,
@@ -109,7 +109,7 @@ export function ClientPropertyAssignment({
   const [isBulkMode, setIsBulkMode] = useState(false)
 
   // Property view mode state
-  const [propertyViewMode, setPropertyViewMode] = useState<PropertyViewMode>('all')
+  const [propertyViewMode, setPropertyViewMode] = useState<PropertyViewMode>('scraped')
 
   // New property modal state
   const [showNewPropertyModal, setShowNewPropertyModal] = useState(false)
@@ -162,14 +162,12 @@ export function ClientPropertyAssignment({
         // Only show saved/starred properties that are available (not assigned)
         return properties.filter((p) => savedPropertyIds.includes(p.id))
       case 'scraped':
+      default:
         // Show properties that were scraped specifically for this client
         // These are in the available list (not yet assigned)
         return properties.filter((p) =>
           scrapedForClientPropertyIds.includes(p.id) || p.scraped_for_client_id === clientId
         )
-      case 'all':
-      default:
-        return properties
     }
   }
 
@@ -1858,15 +1856,15 @@ export function ClientPropertyAssignment({
             {/* View Mode Toggle */}
             <div className="flex gap-1 p-1 bg-white/5 rounded-lg border border-white/10">
               <button
-                onClick={() => setPropertyViewMode('all')}
+                onClick={() => setPropertyViewMode('scraped')}
                 className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                  propertyViewMode === 'all'
-                    ? 'bg-white text-black'
+                  propertyViewMode === 'scraped'
+                    ? 'bg-purple-500 text-white'
                     : 'text-white/70 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <Globe className="h-3.5 w-3.5" />
-                <span>All</span>
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>History</span>
               </button>
               <button
                 onClick={() => setPropertyViewMode('saved')}
@@ -1878,17 +1876,6 @@ export function ClientPropertyAssignment({
               >
                 <Star className="h-3.5 w-3.5" />
                 <span>Saved</span>
-              </button>
-              <button
-                onClick={() => setPropertyViewMode('scraped')}
-                className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs sm:text-sm font-medium transition-all ${
-                  propertyViewMode === 'scraped'
-                    ? 'bg-purple-500 text-white'
-                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>Scraped</span>
               </button>
             </div>
           </div>

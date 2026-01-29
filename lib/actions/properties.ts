@@ -16,6 +16,7 @@ export type Property = {
   created_at: string | null
   updated_at: string | null
   property_manager_id: string | null
+  scraped_for_client_id?: string | null
   // Pricing display options
   show_monthly_rent?: boolean
   custom_monthly_rent?: number | null
