@@ -82,6 +82,8 @@ export default function QuoteViewPage() {
         setError(error)
       } else {
         setQuote(data)
+        console.log('Quote pdf_customization:', data?.pdf_customization)
+        console.log('Hidden items:', data?.pdf_customization?.hidden_service_items)
       }
       setIsLoading(false)
     }
