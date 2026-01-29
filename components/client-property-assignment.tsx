@@ -163,13 +163,9 @@ export function ClientPropertyAssignment({
         return properties.filter((p) => savedPropertyIds.includes(p.id))
       case 'scraped':
       default:
-        // Show properties that:
-        // 1. Were scraped specifically for this client, OR
-        // 2. Are NOT scraped for any specific client (legacy properties available to everyone)
+        // Show only properties that were scraped specifically for this client
         return properties.filter((p) =>
-          scrapedForClientPropertyIds.includes(p.id) ||
-          p.scraped_for_client_id === clientId ||
-          !p.scraped_for_client_id
+          scrapedForClientPropertyIds.includes(p.id) || p.scraped_for_client_id === clientId
         )
     }
   }
