@@ -27,6 +27,7 @@ export default async function QuotesPage() {
         quotes={quotesResult.data || []}
         managers={managersResult.data || []}
         showManagerFilter={true}
+        isAdmin={true}
       />
     </div>
   )

@@ -80,9 +80,10 @@ type Props = {
   quotes: QuoteWithManager[]
   managers?: ManagerInfo[]
   showManagerFilter?: boolean
+  isAdmin?: boolean
 }
 
-export function QuotesList({ quotes, managers = [], showManagerFilter = false }: Props) {
+export function QuotesList({ quotes, managers = [], showManagerFilter = false, isAdmin = false }: Props) {
   const [searchTerm, setSearchTerm] = useState('')
   const [managerFilter, setManagerFilter] = useState<string>('all')
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
@@ -825,6 +826,7 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false }:
           onSave={() => {
             router.refresh()
           }}
+          isAdmin={isAdmin}
         />
       )}
     </div>
