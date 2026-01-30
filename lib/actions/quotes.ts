@@ -1376,3 +1376,156 @@ ${process.env.CONTACT_EMAIL || 'brody@cadizlluis.com'}
 
   await transporter.sendMail(mailOptions)
 }
+
+// Add a new service item to an existing quote
+export async function addServiceItemToQuote(
+  quoteId: string,
+  serviceItem: {
+    service_name: string
+    description?: string
+    price: number
+    images?: string[]
+  }
+): Promise<{ data: QuoteServiceItem | null; error: string | null }> {
+  const supabase = await createClient()
+
+  // Verify user owns this quote
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { data: null, error: 'Unauthorized' }
+  }
+
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+  if (managerError || !managerProfile) {
+    return { data: null, error: managerError || 'Manager profile not found' }
+  }
+
+  // Check quote exists and belongs to this manager
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select('id, manager_id, total, subtotal')
+    .eq('id', quoteId)
+    .single()
+
+  if (quoteError || !quote) {
+    return { data: null, error: 'Quote not found' }
+  }
+
+  if (quote.manager_id !== managerProfile.id) {
+    return { data: null, error: 'Unauthorized' }
+  }
+
+  // Insert the new service item
+  const { data: newItem, error: insertError } = await supabase
+    .from('quote_service_items')
+    .insert({
+      quote_id: quoteId,
+      service_name: serviceItem.service_name,
+      description: serviceItem.description || null,
+      price: serviceItem.price,
+      images: serviceItem.images || [],
+    })
+    .select()
+    .single()
+
+  if (insertError) {
+    return { data: null, error: insertError.message }
+  }
+
+  // Update quote totals
+  const newSubtotal = (quote.subtotal || 0) + serviceItem.price
+  const { error: updateError } = await supabase
+    .from('quotes')
+    .update({
+      subtotal: newSubtotal,
+      total: newSubtotal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quoteId)
+
+  if (updateError) {
+    console.error('Failed to update quote totals:', updateError)
+  }
+
+  revalidatePath('/admin/quotes')
+  revalidatePath(`/quote/${quoteId}`)
+
+  return { data: newItem, error: null }
+}
+
+// Delete a service item from a quote
+export async function deleteServiceItemFromQuote(
+  quoteId: string,
+  serviceItemId: string
+): Promise<{ error: string | null }> {
+  const supabase = await createClient()
+
+  // Verify user owns this quote
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return { error: 'Unauthorized' }
+  }
+
+  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
+  if (managerError || !managerProfile) {
+    return { error: managerError || 'Manager profile not found' }
+  }
+
+  // Check quote exists and belongs to this manager
+  const { data: quote, error: quoteError } = await supabase
+    .from('quotes')
+    .select('id, manager_id, total, subtotal')
+    .eq('id', quoteId)
+    .single()
+
+  if (quoteError || !quote) {
+    return { error: 'Quote not found' }
+  }
+
+  if (quote.manager_id !== managerProfile.id) {
+    return { error: 'Unauthorized' }
+  }
+
+  // Get the service item to know its price
+  const { data: serviceItem, error: itemError } = await supabase
+    .from('quote_service_items')
+    .select('price')
+    .eq('id', serviceItemId)
+    .eq('quote_id', quoteId)
+    .single()
+
+  if (itemError || !serviceItem) {
+    return { error: 'Service item not found' }
+  }
+
+  // Delete the service item
+  const { error: deleteError } = await supabase
+    .from('quote_service_items')
+    .delete()
+    .eq('id', serviceItemId)
+    .eq('quote_id', quoteId)
+
+  if (deleteError) {
+    return { error: deleteError.message }
+  }
+
+  // Update quote totals
+  const newSubtotal = Math.max(0, (quote.subtotal || 0) - serviceItem.price)
+  const { error: updateError } = await supabase
+    .from('quotes')
+    .update({
+      subtotal: newSubtotal,
+      total: newSubtotal,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quoteId)
+
+  if (updateError) {
+    console.error('Failed to update quote totals:', updateError)
+  }
+
+  revalidatePath('/admin/quotes')
+  revalidatePath(`/quote/${quoteId}`)
+
+  return { error: null }
+}
