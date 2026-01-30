@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { QuoteWithItems, PDFCustomization, ServiceOverride, updateQuotePDFCustomization } from '@/lib/actions/quotes'
+import { QuoteWithItems, PDFCustomization, ServiceOverride, updateQuotePDFCustomization, addServiceItemToQuote, deleteServiceItemFromQuote } from '@/lib/actions/quotes'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   RotateCcw,
@@ -83,14 +83,34 @@ export function QuotePDFBuilderDialog({
   // Hidden service items (admin only) - stores IDs of items to exclude from PDF
   const [hiddenServiceItems, setHiddenServiceItems] = useState<Set<string>>(new Set())
 
+  // Add new service item state
+  const [showAddServiceForm, setShowAddServiceForm] = useState(false)
+  const [isAddingService, setIsAddingService] = useState(false)
+  const [newServiceName, setNewServiceName] = useState('')
+  const [newServicePrice, setNewServicePrice] = useState<number>(0)
+  const [newServiceDescription, setNewServiceDescription] = useState('')
+  const [newServiceModel, setNewServiceModel] = useState('')
+  const [newServicePassengers, setNewServicePassengers] = useState('')
+  const [newServiceFlightTime, setNewServiceFlightTime] = useState('')
+  const [newServiceImages, setNewServiceImages] = useState<string[]>([])
+  const [newServiceUploadingImages, setNewServiceUploadingImages] = useState(false)
+  const [newServiceServicesList, setNewServiceServicesList] = useState<string[]>(['Crew & in-flight refreshments', 'VIP handling & concierge coordination'])
+  const newServiceFileInputRef = useRef<HTMLInputElement | null>(null)
+  const [localQuote, setLocalQuote] = useState(quote)
+
+  // Sync localQuote when quote prop changes
+  useEffect(() => {
+    setLocalQuote(quote)
+  }, [quote])
+
   // Initialize state from existing customization
   useEffect(() => {
-    if (isOpen && quote) {
-      const existing = quote.pdf_customization
+    if (isOpen && localQuote) {
+      const existing = localQuote.pdf_customization
       setHeaderTitle(existing?.header_title || '')
       setHeaderSubtitle(existing?.header_subtitle || '')
       setHeaderIcon(existing?.header_icon || 'plane')
-      setCustomNotes(existing?.custom_notes || quote.notes || '')
+      setCustomNotes(existing?.custom_notes || localQuote.notes || '')
       setCustomTerms(existing?.custom_terms || '')
 
       // Initialize route info
@@ -104,7 +124,7 @@ export function QuotePDFBuilderDialog({
 
       // Initialize service overrides
       const overrides: { [key: string]: ServiceOverrideState } = {}
-      quote.service_items.forEach((item, index) => {
+      localQuote.service_items.forEach((item, index) => {
         const existingOverride = existing?.service_overrides?.[item.id]
         overrides[item.id] = {
           display_name: existingOverride?.display_name || item.service_name,
@@ -121,8 +141,14 @@ export function QuotePDFBuilderDialog({
         }
       })
       setServiceOverrides(overrides)
+
+      // Reset add service form
+      setShowAddServiceForm(false)
+      setNewServiceName('')
+      setNewServicePrice(0)
+      setNewServiceDescription('')
     }
-  }, [isOpen, quote])
+  }, [isOpen, localQuote])
 
   // Build current customization object
   const buildCustomization = (): PDFCustomization => {
@@ -157,7 +183,7 @@ export function QuotePDFBuilderDialog({
     try {
       const customization = buildCustomization()
 
-      const result = await updateQuotePDFCustomization(quote.id, customization)
+      const result = await updateQuotePDFCustomization(localQuote.id, customization)
 
       if (result.error) {
         toast({
@@ -194,12 +220,12 @@ export function QuotePDFBuilderDialog({
     setDepartureCity('')
     setArrivalCode('')
     setArrivalCity('')
-    setCustomNotes(quote.notes || '')
+    setCustomNotes(localQuote.notes || '')
     setCustomTerms('')
     setHiddenServiceItems(new Set())
 
     const overrides: { [key: string]: ServiceOverrideState } = {}
-    quote.service_items.forEach((item, index) => {
+    localQuote.service_items.forEach((item, index) => {
       overrides[item.id] = {
         display_name: item.service_name,
         display_description: item.description || '',
@@ -254,6 +280,230 @@ export function QuotePDFBuilderDialog({
         services_list: prev[serviceId]?.services_list?.filter((_, i) => i !== index) || [],
       }
     }))
+  }
+
+  // Handler to add a new quote service item
+  const handleAddNewServiceItem = async () => {
+    if (!newServiceName.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Service name is required',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    if (newServicePrice <= 0) {
+      toast({
+        title: 'Error',
+        description: 'Price must be greater than 0',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsAddingService(true)
+
+    try {
+      const result = await addServiceItemToQuote(localQuote.id, {
+        service_name: newServiceName.trim(),
+        description: newServiceDescription.trim() || undefined,
+        price: newServicePrice,
+        images: newServiceImages,
+      })
+
+      if (result.error) {
+        toast({
+          title: 'Error',
+          description: result.error,
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (result.data) {
+        // Add the new item to localQuote
+        const newItem = result.data
+        setLocalQuote(prev => ({
+          ...prev,
+          service_items: [...prev.service_items, newItem],
+          subtotal: prev.subtotal + newServicePrice,
+          total: prev.total + newServicePrice,
+        }))
+
+        // Initialize override for the new item with form values
+        setServiceOverrides(prev => ({
+          ...prev,
+          [newItem.id]: {
+            display_name: newItem.service_name,
+            display_description: newItem.description || '',
+            display_images: newServiceImages,
+            details: [],
+            jet_model: newServiceModel.trim() || '',
+            passengers: newServicePassengers.trim() || '',
+            flight_time: newServiceFlightTime.trim() || '',
+            services_list: newServiceServicesList.filter(s => s.trim() !== ''),
+            price_override: undefined,
+            expanded: true,
+          }
+        }))
+
+        // Reset form
+        setNewServiceName('')
+        setNewServicePrice(0)
+        setNewServiceDescription('')
+        setNewServiceModel('')
+        setNewServicePassengers('')
+        setNewServiceFlightTime('')
+        setNewServiceImages([])
+        setNewServiceServicesList(['Crew & in-flight refreshments', 'VIP handling & concierge coordination'])
+        setShowAddServiceForm(false)
+
+        toast({
+          title: 'Success',
+          description: 'Aircraft option added successfully',
+        })
+
+        router.refresh()
+      }
+    } catch (error) {
+      console.error('Error adding service item:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to add service item',
+        variant: 'destructive',
+      })
+    } finally {
+      setIsAddingService(false)
+    }
+  }
+
+  // Handler to upload images for new service (uses Cloudinary directly)
+  const handleNewServiceImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    setNewServiceUploadingImages(true)
+
+    try {
+      const uploadPromises = Array.from(files).slice(0, 2 - newServiceImages.length).map(async (file) => {
+        // Validate file type
+        const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp']
+        if (!validTypes.includes(file.type)) {
+          throw new Error(`Invalid file type: ${file.name}. Please use PNG, JPEG, or WEBP.`)
+        }
+
+        // Validate file size (max 25MB)
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error(`File too large: ${file.name}. Max size is 25MB.`)
+        }
+
+        // Upload to Cloudinary
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('upload_preset', 'concierge')
+        formData.append('folder', 'concierge')
+
+        const response = await fetch(
+          `https://api.cloudinary.com/v1_1/dku1gnuat/image/upload`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error(`Failed to upload ${file.name}`)
+        }
+
+        const data = await response.json()
+        return data.secure_url
+      })
+
+      const uploadedUrls = await Promise.all(uploadPromises)
+      setNewServiceImages(prev => [...prev, ...uploadedUrls].slice(0, 2))
+
+      toast({
+        title: 'Images uploaded',
+        description: `${uploadedUrls.length} image(s) uploaded successfully`,
+      })
+    } catch (error) {
+      console.error('Upload error:', error)
+      toast({
+        title: 'Upload failed',
+        description: error instanceof Error ? error.message : 'Failed to upload images',
+        variant: 'destructive',
+      })
+    } finally {
+      setNewServiceUploadingImages(false)
+      if (newServiceFileInputRef.current) {
+        newServiceFileInputRef.current.value = ''
+      }
+    }
+  }
+
+  // Handler to delete a quote service item
+  const handleDeleteServiceItem = async (serviceItemId: string) => {
+    const item = localQuote.service_items.find(i => i.id === serviceItemId)
+    if (!item) return
+
+    // Don't allow deleting the last item
+    if (localQuote.service_items.length === 1) {
+      toast({
+        title: 'Error',
+        description: 'Cannot delete the last service item',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      const result = await deleteServiceItemFromQuote(localQuote.id, serviceItemId)
+
+      if (result.error) {
+        toast({
+          title: 'Error',
+          description: result.error,
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // Remove item from localQuote
+      setLocalQuote(prev => ({
+        ...prev,
+        service_items: prev.service_items.filter(i => i.id !== serviceItemId),
+        subtotal: Math.max(0, prev.subtotal - item.price),
+        total: Math.max(0, prev.total - item.price),
+      }))
+
+      // Remove from overrides
+      setServiceOverrides(prev => {
+        const newOverrides = { ...prev }
+        delete newOverrides[serviceItemId]
+        return newOverrides
+      })
+
+      // Remove from hidden items if present
+      setHiddenServiceItems(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(serviceItemId)
+        return newSet
+      })
+
+      toast({
+        title: 'Success',
+        description: 'Service item deleted',
+      })
+
+      router.refresh()
+    } catch (error) {
+      console.error('Error deleting service item:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to delete service item',
+        variant: 'destructive',
+      })
+    }
   }
 
   // Helper function to convert oklch/oklab colors to hex
@@ -650,7 +900,7 @@ export function QuotePDFBuilderDialog({
 
       const imgData = canvas.toDataURL('image/png')
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight)
-      pdf.save(`${quote.quote_number}.pdf`)
+      pdf.save(`${localQuote.quote_number}.pdf`)
 
       toast({
         title: 'PDF Downloaded',
@@ -777,9 +1027,9 @@ export function QuotePDFBuilderDialog({
           throw new Error(`Invalid file type: ${file.name}. Please use PNG, JPEG, or WEBP.`)
         }
 
-        // Validate file size (10MB max)
-        if (file.size > 10 * 1024 * 1024) {
-          throw new Error(`File too large: ${file.name}. Max size is 10MB.`)
+        // Validate file size (25MB max)
+        if (file.size > 25 * 1024 * 1024) {
+          throw new Error(`File too large: ${file.name}. Max size is 25MB.`)
         }
 
         // Upload to Cloudinary
@@ -856,6 +1106,7 @@ export function QuotePDFBuilderDialog({
   }
 
   return (
+    <>
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="glass-card-accent border-white/20 text-white w-[98vw] !max-w-[98vw] h-[98vh] !max-h-[98vh] p-0 flex flex-col">
         <DialogHeader className="space-y-1 sm:space-y-2 pb-3 sm:pb-4 border-b border-white/10 px-4 sm:px-6 pt-4 sm:pt-6">
@@ -972,11 +1223,25 @@ export function QuotePDFBuilderDialog({
 
               {/* Jet Options Section */}
               <div className="space-y-3 sm:space-y-4">
-                <h3 className="text-base sm:text-lg font-semibold text-white">
-                  {headerIcon === 'plane' ? 'Aircraft Options' : 'Service Options'}
-                </h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-base sm:text-lg font-semibold text-white">
+                    {headerIcon === 'plane' ? 'Aircraft Options' : 'Service Options'}
+                  </h3>
+                  {isAdmin && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAddServiceForm(true)}
+                      className="border-white/30 hover:bg-white/10 text-white text-xs"
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      Add Service
+                    </Button>
+                  )}
+                </div>
 
-                {quote.service_items.map((item, index) => {
+                {localQuote.service_items.map((item, index) => {
                   const override = serviceOverrides[item.id] || {}
                   const isExpanded = override.expanded
                   const isHidden = hiddenServiceItems.has(item.id)
@@ -1290,7 +1555,8 @@ export function QuotePDFBuilderDialog({
                     </div>
                   )
                 })}
-              </div>
+
+                              </div>
 
               {/* Notes Section */}
               <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10">
@@ -1343,17 +1609,17 @@ export function QuotePDFBuilderDialog({
                         <div style={{ backgroundColor: '#1a1a1a', padding: '8px 14px', borderTopLeftRadius: '4px', borderTopRightRadius: '8px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px', marginBottom: '10px', display: 'inline-block' }}>
                           <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Prepared for:</p>
                         </div>
-                        <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '4px' }}>{quote.client_name}</p>
-                        <p style={{ fontSize: '11px', color: '#6b7280' }}>{quote.client_email}</p>
+                        <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '4px' }}>{localQuote.client_name}</p>
+                        <p style={{ fontSize: '11px', color: '#6b7280' }}>{localQuote.client_email}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ backgroundColor: '#1a1a1a', padding: '8px 14px', borderTopLeftRadius: '4px', borderTopRightRadius: '8px', borderBottomLeftRadius: '4px', borderBottomRightRadius: '4px', marginBottom: '10px', display: 'inline-block' }}>
                           <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.6px' }}>Date:</p>
                         </div>
                         <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a', marginBottom: '4px' }}>
-                          {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {new Date(localQuote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </p>
-                        <p style={{ fontSize: '11px', color: '#6b7280' }}>{quote.quote_number}</p>
+                        <p style={{ fontSize: '11px', color: '#6b7280' }}>{localQuote.quote_number}</p>
                       </div>
                     </div>
 
@@ -1361,7 +1627,7 @@ export function QuotePDFBuilderDialog({
                     <div style={{ borderBottom: '1px dashed #d1d5db', margin: '10px 50px' }}></div>
 
                     {/* Loop through yacht service items (max 5, excluding hidden) */}
-                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
+                    {localQuote.service_items && localQuote.service_items.length > 0 && localQuote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
                       if (!item) return null
 
                       const override = serviceOverrides[item.id] || {}
@@ -1457,7 +1723,7 @@ export function QuotePDFBuilderDialog({
                           </div>
 
                           {/* Separator between yachts */}
-                          {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                          {idx < Math.min(localQuote.service_items.length, 5) - 1 && (
                             <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
                           )}
                         </div>
@@ -1468,10 +1734,10 @@ export function QuotePDFBuilderDialog({
                     <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
 
                     {/* Notes Section */}
-                    {(customNotes || quote.notes) && (
+                    {(customNotes || localQuote.notes) && (
                       <div style={{ padding: '18px 40px' }}>
                         <p style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>NOTES:</p>
-                        <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{customNotes || quote.notes}</p>
+                        <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{customNotes || localQuote.notes}</p>
                       </div>
                     )}
 
@@ -1480,10 +1746,10 @@ export function QuotePDFBuilderDialog({
                       <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', letterSpacing: '2.8px', marginBottom: '7px' }}>CADIZ & LLUIS</p>
                       <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px' }}>LUXURY LIVING</p>
                       <p style={{ fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                        QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                        QUOTE VALID UNTIL {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
                       </p>
                       <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                        {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
+                        {localQuote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
                       </p>
                     </div>
                   </div>
@@ -1518,22 +1784,22 @@ export function QuotePDFBuilderDialog({
                         <div style={{ backgroundColor: '#1a1a1a', padding: '4px 10px', marginBottom: '8px', display: 'inline-block' }}>
                           <p style={{ fontSize: '8px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>PREPARED FOR:</p>
                         </div>
-                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', marginBottom: '3px' }}>{quote.client_name}</p>
-                        <p style={{ fontSize: '9px', color: '#6b7280' }}>{quote.client_email}</p>
+                        <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', marginBottom: '3px' }}>{localQuote.client_name}</p>
+                        <p style={{ fontSize: '9px', color: '#6b7280' }}>{localQuote.client_email}</p>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div style={{ backgroundColor: '#1a1a1a', padding: '4px 10px', marginBottom: '8px', display: 'inline-block' }}>
                           <p style={{ fontSize: '8px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 600 }}>EXCLUSIVE RATES</p>
                         </div>
                         <p style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a', marginBottom: '3px' }}>
-                          {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {new Date(localQuote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </p>
-                        <p style={{ fontSize: '9px', color: '#6b7280' }}>{quote.quote_number}</p>
+                        <p style={{ fontSize: '9px', color: '#6b7280' }}>{localQuote.quote_number}</p>
                       </div>
                     </div>
 
                     {/* Loop through car service items (max 5, excluding hidden) */}
-                    {quote.service_items && quote.service_items.length > 0 && quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
+                    {localQuote.service_items && localQuote.service_items.length > 0 && localQuote.service_items.filter(item => !hiddenServiceItems.has(item.id)).slice(0, 5).map((item, idx) => {
                       if (!item) return null
                       const override = serviceOverrides[item.id] || {}
                       const images = item.images || []
@@ -1615,7 +1881,7 @@ export function QuotePDFBuilderDialog({
                           </div>
 
                           {/* Separator between cars */}
-                          {idx < Math.min(quote.service_items.length, 5) - 1 && (
+                          {idx < Math.min(localQuote.service_items.length, 5) - 1 && (
                             <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 50px' }}></div>
                           )}
                         </div>
@@ -1626,10 +1892,10 @@ export function QuotePDFBuilderDialog({
                     <div style={{ borderBottom: '1px solid #e5e7eb', margin: '20px 40px' }}></div>
 
                     {/* Notes Section */}
-                    {quote.notes && (
+                    {localQuote.notes && (
                       <div style={{ padding: '18px 40px' }}>
                         <p style={{ fontSize: '8px', color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '8px' }}>NOTES:</p>
-                        <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{quote.notes}</p>
+                        <p style={{ fontSize: '10px', color: '#6b7280', lineHeight: '1.5' }}>{localQuote.notes}</p>
                       </div>
                     )}
 
@@ -1638,10 +1904,10 @@ export function QuotePDFBuilderDialog({
                       <p style={{ fontSize: '18px', fontWeight: 700, color: 'white', letterSpacing: '2.5px', marginBottom: '5px' }}>CADIZ & LLUIS</p>
                       <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '1.8px', textTransform: 'uppercase', marginBottom: '16px' }}>LUXURY LIVING</p>
                       <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                        QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                        QUOTE VALID UNTIL {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
                       </p>
                       <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)' }}>
-                        {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
+                        {localQuote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
                       </p>
                     </div>
                   </div>
@@ -1695,15 +1961,15 @@ export function QuotePDFBuilderDialog({
                     <div className="flex justify-between items-start mb-6">
                       <div>
                         <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Prepared for:</p>
-                        <p className="text-sm font-semibold text-gray-900">{quote.client_name}</p>
-                        <p className="text-xs text-gray-500">{quote.client_email}</p>
+                        <p className="text-sm font-semibold text-gray-900">{localQuote.client_name}</p>
+                        <p className="text-xs text-gray-500">{localQuote.client_email}</p>
                       </div>
                       <div className="text-right">
                         <p className="text-[9px] text-gray-400 uppercase tracking-wider mb-1">Date:</p>
                         <p className="text-sm font-semibold text-gray-900">
-                          {new Date(quote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                          {new Date(localQuote.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                         </p>
-                        <p className="text-xs text-gray-500">{quote.quote_number}</p>
+                        <p className="text-xs text-gray-500">{localQuote.quote_number}</p>
                       </div>
                     </div>
 
@@ -1732,7 +1998,7 @@ export function QuotePDFBuilderDialog({
                   </div>
 
                   {/* Aircraft Options (excluding hidden) */}
-                  {quote.service_items.filter(item => !hiddenServiceItems.has(item.id)).map((item, index) => {
+                  {localQuote.service_items.filter(item => !hiddenServiceItems.has(item.id)).map((item, index) => {
                     const override = serviceOverrides[item.id] || {}
                     const displayImages = override.display_images?.slice(0, 2) || item.images?.slice(0, 2) || []
                     const displayName = override.display_name || item.service_name
@@ -1848,10 +2114,10 @@ export function QuotePDFBuilderDialog({
                     <p className="text-lg font-bold text-white tracking-[0.2em] mb-1">CADIZ & LLUIS</p>
                     <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Luxury Living</p>
                     <p className="text-[10px] text-white uppercase tracking-wider mb-2">
-                      Quote valid until {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      Quote valid until {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
                     </p>
                     <p className="text-[10px] text-gray-500">
-                      {quote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
+                      {localQuote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
                     </p>
                   </div>
                 </div>
@@ -1914,6 +2180,244 @@ export function QuotePDFBuilderDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Add Service Popup */}
+    <Dialog open={showAddServiceForm} onOpenChange={(open) => {
+      setShowAddServiceForm(open)
+      if (!open) {
+        setNewServiceName('')
+        setNewServicePrice(0)
+        setNewServiceDescription('')
+        setNewServiceModel('')
+        setNewServicePassengers('')
+        setNewServiceFlightTime('')
+        setNewServiceImages([])
+        setNewServiceServicesList(['Crew & in-flight refreshments', 'VIP handling & concierge coordination'])
+      }
+    }}>
+      <DialogContent className="glass-card-accent border-white/20 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-white flex items-center gap-2">
+            <Plane className="h-5 w-5" />
+            Add Aircraft Option
+          </DialogTitle>
+          <DialogDescription className="text-white/70">
+            Add another aircraft option to this quote
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          {/* Aircraft Name & Model */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-white/90">Aircraft Name *</Label>
+              <Input
+                value={newServiceName}
+                onChange={(e) => setNewServiceName(e.target.value)}
+                placeholder="e.g., 2022 LearJet"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/90">Model</Label>
+              <Input
+                value={newServiceModel}
+                onChange={(e) => setNewServiceModel(e.target.value)}
+                placeholder="e.g., 45xr"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+              />
+            </div>
+          </div>
+
+          {/* Price */}
+          <div className="space-y-2">
+            <Label className="text-white/90">Price *</Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/50">$</span>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={newServicePrice || ''}
+                onChange={(e) => setNewServicePrice(parseFloat(e.target.value) || 0)}
+                placeholder="0.00"
+                className="pl-7 bg-white/5 border-white/20 text-white placeholder:text-white/40"
+              />
+            </div>
+          </div>
+
+          {/* Passengers & Flight Time */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="text-white/90">Passengers</Label>
+              <Input
+                value={newServicePassengers}
+                onChange={(e) => setNewServicePassengers(e.target.value)}
+                placeholder="e.g., 8"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-white/90">Flight Time</Label>
+              <Input
+                value={newServiceFlightTime}
+                onChange={(e) => setNewServiceFlightTime(e.target.value)}
+                placeholder="e.g., 3h 27m"
+                className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
+              />
+            </div>
+          </div>
+
+          {/* Images */}
+          <div className="space-y-2">
+            <Label className="text-white/90 flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Aircraft Images (Exterior + Interior)
+            </Label>
+            {newServiceImages.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {newServiceImages.map((imageUrl, imgIndex) => (
+                  <div key={imgIndex} className="relative w-24 h-18 rounded-lg overflow-hidden border border-white/20 group">
+                    <img src={imageUrl} alt={imgIndex === 0 ? 'Exterior' : 'Interior'} className="w-full h-full object-cover" />
+                    <div className="absolute top-1 left-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
+                      {imgIndex === 0 ? 'Exterior' : 'Interior'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setNewServiceImages(prev => prev.filter((_, i) => i !== imgIndex))}
+                      className="absolute top-1 right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                ref={newServiceFileInputRef}
+                accept="image/png,image/jpeg,image/jpg,image/webp"
+                multiple
+                className="hidden"
+                onChange={(e) => handleNewServiceImageUpload(e.target.files)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => newServiceFileInputRef.current?.click()}
+                disabled={newServiceUploadingImages || newServiceImages.length >= 2}
+                className="text-xs border-white/20 text-white/70 hover:bg-white/10"
+              >
+                {newServiceUploadingImages ? (
+                  <>
+                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-3 w-3 mr-1" />
+                    Upload Images {newServiceImages.length > 0 && `(${newServiceImages.length}/2)`}
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Included Services */}
+          <div className="space-y-2">
+            <Label className="text-white/90">Included Services</Label>
+            <div className="space-y-2">
+              {newServiceServicesList.map((service, svcIndex) => (
+                <div key={svcIndex} className="flex items-center gap-2">
+                  <span className="text-white/50">•</span>
+                  <Input
+                    value={service}
+                    onChange={(e) => {
+                      const updated = [...newServiceServicesList]
+                      updated[svcIndex] = e.target.value
+                      setNewServiceServicesList(updated)
+                    }}
+                    placeholder="Service description..."
+                    className="bg-white/5 border-white/20 text-white placeholder:text-white/40 flex-1 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setNewServiceServicesList(prev => prev.filter((_, i) => i !== svcIndex))}
+                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setNewServiceServicesList(prev => [...prev, ''])}
+                className="text-white/60 hover:text-white hover:bg-white/10 text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Service
+              </Button>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label className="text-white/90">Description (optional)</Label>
+            <Textarea
+              value={newServiceDescription}
+              onChange={(e) => setNewServiceDescription(e.target.value)}
+              placeholder="Aircraft details..."
+              rows={2}
+              className="bg-white/5 border-white/20 text-white placeholder:text-white/40 resize-none"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-3">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => {
+              setShowAddServiceForm(false)
+              setNewServiceName('')
+              setNewServicePrice(0)
+              setNewServiceDescription('')
+              setNewServiceModel('')
+              setNewServicePassengers('')
+              setNewServiceFlightTime('')
+              setNewServiceImages([])
+              setNewServiceServicesList(['Crew & in-flight refreshments', 'VIP handling & concierge coordination'])
+            }}
+            className="text-white/70 hover:text-white hover:bg-white/10"
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            onClick={handleAddNewServiceItem}
+            disabled={isAddingService || !newServiceName.trim() || newServicePrice <= 0}
+            className="bg-white/20 hover:bg-white/30 text-white"
+          >
+            {isAddingService ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Aircraft
+              </>
+            )}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 
