@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getCurrentManagerProfile } from '@/lib/actions/clients'
+import { isSuperAdmin } from '@/lib/auth/roles'
 
 export type QuoteStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'expired'
 
@@ -1395,12 +1396,11 @@ export async function addServiceItemToQuote(
     return { data: null, error: 'Unauthorized' }
   }
 
-  const { data: managerProfile, error: managerError } = await getCurrentManagerProfile()
-  if (managerError || !managerProfile) {
-    return { data: null, error: managerError || 'Manager profile not found' }
-  }
+  // Check if user is super admin or any manager
+  const isAdmin = await isSuperAdmin()
+  const { data: managerProfile } = await getCurrentManagerProfile()
 
-  // Check quote exists and belongs to this manager
+  // Check quote exists
   const { data: quote, error: quoteError } = await supabase
     .from('quotes')
     .select('id, manager_id, total, subtotal')
@@ -1411,7 +1411,11 @@ export async function addServiceItemToQuote(
     return { data: null, error: 'Quote not found' }
   }
 
-  if (quote.manager_id !== managerProfile.id) {
+  // Allow if super admin, or any manager viewing from admin area, or quote owner
+  const isManager = !!managerProfile
+  const isQuoteOwner = managerProfile && quote.manager_id === managerProfile.id
+
+  if (!isAdmin && !isManager) {
     return { data: null, error: 'Unauthorized' }
   }
 
