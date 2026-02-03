@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!)
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) {
+    throw new Error('STRIPE_SECRET_KEY is not configured')
+  }
+  return new Stripe(process.env.STRIPE_SECRET_KEY)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,6 +18,8 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    const stripe = getStripe()
 
     // Create a PaymentIntent with the order amount and currency (card only)
     const paymentIntent = await stripe.paymentIntents.create({
