@@ -42,38 +42,55 @@ export default async function AdminClientPage({
   const { data: { user } } = await supabase.auth.getUser()
   let isSharedWithMe = false
   let sharedByManager = null
+  let currentManagerId = manager.id // Default to client's owner manager
 
   if (user) {
-    const { data: currentManager } = await supabase
+    // First try to find manager by auth_user_id
+    let { data: currentManager } = await supabase
       .from('property_managers')
       .select('id')
       .eq('auth_user_id', user.id)
       .single()
 
-    if (currentManager && currentManager.id !== manager.id) {
-      // This client doesn't belong to the current manager, check if it's shared
-      const { data: shareData } = await supabase
-        .from('client_shares')
-        .select(`
-          id,
-          shared_by:property_managers!shared_by_manager_id(id, name, email)
-        `)
-        .eq('client_id', id)
-        .eq('shared_with_manager_id', currentManager.id)
+    // If not found by auth_user_id, try matching by email
+    if (!currentManager) {
+      const { data: managerByEmail } = await supabase
+        .from('property_managers')
+        .select('id')
+        .eq('email', user.email)
         .single()
+      currentManager = managerByEmail
+    }
 
-      if (shareData) {
-        isSharedWithMe = true
-        sharedByManager = shareData.shared_by as any
+    if (currentManager) {
+      currentManagerId = currentManager.id // Use current user's manager for property queries
+
+      if (currentManager.id !== manager.id) {
+        // This client doesn't belong to the current manager, check if it's shared
+        const { data: shareData } = await supabase
+          .from('client_shares')
+          .select(`
+            id,
+            shared_by:property_managers!shared_by_manager_id(id, name, email)
+          `)
+          .eq('client_id', id)
+          .eq('shared_with_manager_id', currentManager.id)
+          .single()
+
+        if (shareData) {
+          isSharedWithMe = true
+          sharedByManager = shareData.shared_by as any
+        }
       }
     }
   }
 
-  // Fetch only properties assigned to this manager
+  // Fetch properties assigned to the CURRENT USER's manager (not the client's owner)
+  // This ensures newly scraped properties appear in History for the user who scraped them
   const { data: managerAssignments } = await supabase
     .from('property_manager_assignments')
     .select('property_id, properties(*)')
-    .eq('manager_id', manager.id)
+    .eq('manager_id', currentManagerId)
 
   const managerProperties = (managerAssignments?.map((a: any) => a.properties).filter(Boolean) || []) as any[]
 
