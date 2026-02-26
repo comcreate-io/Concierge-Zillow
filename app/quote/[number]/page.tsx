@@ -1125,11 +1125,13 @@ export default function QuoteViewPage() {
 
                   {/* Main Yacht Image */}
                   {displayImages[0] && (
-                    <img
-                      src={displayImages[0]}
-                      alt="Yacht"
-                      style={{ width: '100%', height: '300px', objectFit: 'cover', display: 'block' }}
-                    />
+                    <div style={{ width: '100%', height: '300px', overflow: 'hidden', position: 'relative' }}>
+                      <img
+                        src={displayImages[0]}
+                        alt="Yacht"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                      />
+                    </div>
                   )}
 
                   {/* Description Banner with Chevron Bottom */}
@@ -1182,11 +1184,13 @@ export default function QuoteViewPage() {
                     {/* Right Column - Secondary Image and Additional Text */}
                     <div style={{ width: '280px' }}>
                       {displayImages[1] && (
-                        <img
-                          src={displayImages[1]}
-                          alt="Yacht Interior"
-                          style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block', marginBottom: '24px' }}
-                        />
+                        <div style={{ width: '100%', height: '200px', overflow: 'hidden', position: 'relative', marginBottom: '24px' }}>
+                          <img
+                            src={displayImages[1]}
+                            alt="Yacht Interior"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                          />
+                        </div>
                       )}
                     </div>
                   </div>
