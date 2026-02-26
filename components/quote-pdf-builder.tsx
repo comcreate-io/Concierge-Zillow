@@ -1211,8 +1211,8 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
   // ==================== YACHT LAYOUT ====================
   if (isYachtQuote) {
     // Extract route info
-    const departurePort = customization?.route?.departure_city || 'MIAMI'
-    const destination = customization?.route?.arrival_city || 'BAHAMAS'
+    const departurePort = customization?.route?.departure_city || ''
+    const destination = customization?.route?.arrival_city || ''
 
     // Additional text (like "This boat has been used exclusively...")
     const additionalText = customization?.custom_notes || ''
@@ -1265,8 +1265,8 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
               const duration = override?.flight_time || '8h'
               const servicesList = override?.services_list || ['Crew & amenities', 'Catering & beverages']
               // Get route info for this yacht (use override if exists, otherwise use global)
-              const yachtDeparture = override?.departure_city || customization?.route?.departure_city || 'MIAMI'
-              const yachtDestination = override?.arrival_city || customization?.route?.arrival_city || 'BAHAMAS'
+              const yachtDeparture = override?.departure_city || customization?.route?.departure_city || ''
+              const yachtDestination = override?.arrival_city || customization?.route?.arrival_city || ''
 
               return (
                 <View key={serviceItem.id} style={{ marginTop: idx > 0 ? 30 : 0 }}>
@@ -1308,10 +1308,12 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
                   <View style={styles.yachtDetailsSection}>
                     {/* Left Column - Details */}
                     <View style={styles.yachtDetailsLeft}>
+                      {(yachtDeparture || yachtDestination) && (
                       <View style={styles.yachtDetailItem}>
                         <Text style={styles.yachtDetailLabel}>ROUTE</Text>
                         <Text style={styles.yachtDetailValue}>{yachtDeparture} → {yachtDestination}</Text>
                       </View>
+                      )}
                       <View style={styles.yachtDetailItem}>
                         <Text style={styles.yachtDetailLabel}>PASSENGERS</Text>
                         <Text style={styles.yachtDetailValue}>{passengers}</Text>
@@ -1388,8 +1390,8 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
   // ==================== CAR LAYOUT ====================
   if (isCarQuote) {
     // Extract route info
-    const pickup = customization?.route?.departure_city || 'AIRPORT'
-    const dropoff = customization?.route?.arrival_city || 'HOTEL'
+    const pickup = customization?.route?.departure_city || ''
+    const dropoff = customization?.route?.arrival_city || ''
 
     return (
       <Document>
@@ -1436,8 +1438,8 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
               const passengers = override?.passengers || '4'
               const duration = override?.flight_time || '5 days' // reusing flight_time for duration
               // Get route info for this car (use override if exists, otherwise use global)
-              const carPickup = override?.departure_city || customization?.route?.departure_city || 'AIRPORT'
-              const carDropoff = override?.arrival_city || customization?.route?.arrival_city || 'HOTEL'
+              const carPickup = override?.departure_city || customization?.route?.departure_city || ''
+              const carDropoff = override?.arrival_city || customization?.route?.arrival_city || ''
 
               return (
                 <View key={serviceItem.id} style={{ marginTop: idx > 0 ? 40 : 0 }}>
@@ -1461,10 +1463,12 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
                   <View style={styles.carContentSection}>
                     {/* Left Column - Details and Description */}
                     <View style={styles.carContentLeft}>
+                      {(carPickup || carDropoff) && (
                       <View style={styles.carDetailItem}>
                         <Text style={styles.carDetailLabel}>ROUTE</Text>
                         <Text style={styles.carDetailValue}>{carPickup} → {carDropoff}</Text>
                       </View>
+                      )}
                       <View style={styles.carDetailItem}>
                         <Text style={styles.carDetailLabel}>PASSENGERS</Text>
                         <Text style={styles.carDetailValue}>{passengers}</Text>

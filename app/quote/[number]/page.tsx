@@ -1113,8 +1113,8 @@ export default function QuoteViewPage() {
               const duration = override.flight_time || '8h'
               const servicesList = override.services_list || ['Crew & amenities', 'Catering & beverages']
               // Get route for this yacht
-              const yachtDeparture = override.departure_city || quote.pdf_customization?.route?.departure_city || 'MIAMI'
-              const yachtDestination = override.arrival_city || quote.pdf_customization?.route?.arrival_city || 'BAHAMAS'
+              const yachtDeparture = override.departure_city || quote.pdf_customization?.route?.departure_city || ''
+              const yachtDestination = override.arrival_city || quote.pdf_customization?.route?.arrival_city || ''
 
               return (
                 <div key={item.id} style={{ marginTop: idx > 0 ? '30px' : '0' }}>
@@ -1153,10 +1153,12 @@ export default function QuoteViewPage() {
                   <div style={{ display: 'flex', padding: '40px 50px', gap: '28px' }}>
                     {/* Left Column - Details */}
                     <div style={{ flex: 1 }}>
+                      {(yachtDeparture || yachtDestination) && (
                       <div style={{ marginBottom: '24px' }}>
                         <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>ROUTE</p>
                         <p style={{ fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>{yachtDeparture} → {yachtDestination}</p>
                       </div>
+                      )}
                       <div style={{ marginBottom: '24px' }}>
                         <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>PASSENGERS</p>
                         <p style={{ fontSize: '18px', fontWeight: 600, color: '#1a1a1a' }}>{passengers}</p>
@@ -1290,8 +1292,8 @@ export default function QuoteViewPage() {
               const passengers = override.passengers || '4'
               const duration = override.flight_time || '5 days'
               // Get route for this car
-              const carPickup = override.departure_city || quote.pdf_customization?.route?.departure_city || 'AIRPORT'
-              const carDropoff = override.arrival_city || quote.pdf_customization?.route?.arrival_city || 'HOTEL'
+              const carPickup = override.departure_city || quote.pdf_customization?.route?.departure_city || ''
+              const carDropoff = override.arrival_city || quote.pdf_customization?.route?.arrival_city || ''
 
               return (
                 <div key={item.id} style={{ marginTop: idx > 0 ? '40px' : '0' }}>
@@ -1319,10 +1321,12 @@ export default function QuoteViewPage() {
                   <div style={{ display: 'flex', padding: '35px 50px', gap: '35px' }}>
                     {/* Left Column - Details and Description */}
                     <div style={{ flex: 1 }}>
+                      {(carPickup || carDropoff) && (
                       <div style={{ marginBottom: '18px' }}>
                         <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>ROUTE</p>
                         <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>{carPickup} → {carDropoff}</p>
                       </div>
+                      )}
                       <div style={{ marginBottom: '18px' }}>
                         <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '6px' }}>PASSENGERS</p>
                         <p style={{ fontSize: '16px', fontWeight: 600, color: '#1a1a1a' }}>{passengers}</p>
