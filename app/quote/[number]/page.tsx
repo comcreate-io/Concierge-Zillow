@@ -1151,7 +1151,7 @@ export default function QuoteViewPage() {
 
                   {/* Details Section with Two Columns */}
                   <div style={{ display: 'flex', padding: '40px 50px', gap: '28px' }}>
-                    {/* Left Column - Details and Price */}
+                    {/* Left Column - Details */}
                     <div style={{ flex: 1 }}>
                       <div style={{ marginBottom: '24px' }}>
                         <p style={{ fontSize: '10px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '7px' }}>ROUTE</p>
@@ -1171,20 +1171,12 @@ export default function QuoteViewPage() {
                           <p key={serviceIdx} style={{ fontSize: '12px', color: '#1a1a1a', marginBottom: '5px' }}>· {service}</p>
                         ))}
                       </div>
-
-                      {/* Price in Left Column */}
-                      <div style={{ marginTop: '24px' }}>
-                        <p style={{ fontSize: '36px', fontWeight: 700, color: '#1a1a1a', marginBottom: '6px' }}>
-                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override.price_override ?? item.price)}
-                        </p>
-                        <p style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>PRICE</p>
-                      </div>
                     </div>
 
-                    {/* Right Column - Secondary Image and Additional Text */}
+                    {/* Right Column - Secondary Image and Price */}
                     <div style={{ width: '280px' }}>
                       {displayImages[1] && (
-                        <div style={{ width: '100%', height: '200px', overflow: 'hidden', position: 'relative', marginBottom: '24px' }}>
+                        <div style={{ width: '100%', height: '200px', overflow: 'hidden', position: 'relative', borderRadius: '8px' }}>
                           <img
                             src={displayImages[1]}
                             alt="Yacht Interior"
@@ -1192,6 +1184,17 @@ export default function QuoteViewPage() {
                           />
                         </div>
                       )}
+
+                      {/* Price Below Image */}
+                      <div style={{
+                        marginTop: '16px',
+                        textAlign: 'center'
+                      }}>
+                        <p style={{ fontSize: '28px', fontWeight: 700, color: '#1a1a1a', marginBottom: '4px' }}>
+                          {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(override.price_override ?? item.price)}
+                        </p>
+                        <p style={{ fontSize: '8px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '1px' }}>PRICE</p>
+                      </div>
                     </div>
                   </div>
 
