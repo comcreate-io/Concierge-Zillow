@@ -631,7 +631,11 @@ export default function QuoteViewPage() {
             const headerIcon = quote.pdf_customization?.header_icon || 'plane'
             const displayName = override?.display_name || item.service_name
             const displayDescription = override?.display_description || item.description || ''
-            const displayImages = override?.display_images?.length ? override.display_images : item.images || []
+            // Show all images: display_images first (admin-selected), then remaining originals
+            const allImages = item.images || []
+            const selectedImages = override?.display_images?.length ? override.display_images : []
+            const remainingImages = allImages.filter(img => !selectedImages.includes(img))
+            const displayImages = selectedImages.length ? [...selectedImages, ...remainingImages] : allImages
 
             // Jet-specific fields from override
             const jetModel = override?.jet_model || ''
@@ -660,7 +664,7 @@ export default function QuoteViewPage() {
                   {displayImages && displayImages.length > 0 && (
                     <div className="relative">
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-1">
-                        {displayImages.slice(0, 4).map((imageUrl, imgIndex) => (
+                        {displayImages.map((imageUrl, imgIndex) => (
                           <div
                             key={imgIndex}
                             className="aspect-[4/3] cursor-pointer relative overflow-hidden"
@@ -671,11 +675,6 @@ export default function QuoteViewPage() {
                               alt={`${displayName} photo ${imgIndex + 1}`}
                               className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                             />
-                            {imgIndex === 3 && displayImages.length > 4 && (
-                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
-                                <span className="text-white text-lg font-semibold">+{displayImages.length - 4}</span>
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
