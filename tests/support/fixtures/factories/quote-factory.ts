@@ -94,7 +94,7 @@ export class QuoteFactory {
       manager_id: managerId,
       client_name: `Test Client ${timestamp}`,
       client_email: `testclient-${timestamp}@example.com`,
-      valid_until: validUntil.toISOString().split('T')[0],
+      valid_until: validUntil.toISOString(),
       status: 'draft' as QuoteStatus,
       subtotal,
       tax_rate: taxRate,
@@ -182,7 +182,7 @@ export class QuoteFactory {
       {
         status: 'expired',
         sent_at: new Date(pastDate.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-        valid_until: pastDate.toISOString().split('T')[0],
+        valid_until: pastDate.toISOString(),
         ...overrides,
       },
       lineItems

@@ -57,6 +57,23 @@ export function formatNumber(value: string | number): string {
   return number.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
 }
 
+// Format expiration date: includes time for hour-based expirations, date-only for day-based
+export function formatExpirationDate(dateString: string, options?: { uppercase?: boolean }): string {
+  const date = new Date(dateString)
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const seconds = date.getSeconds()
+  const isDateOnly = hours === 0 && minutes === 0 && seconds === 0
+
+  const formatted = isDateOnly
+    ? date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    : date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) +
+      ' at ' +
+      date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+
+  return options?.uppercase ? formatted.toUpperCase() : formatted
+}
+
 // Check if a property value is valid (not empty, not "Contact for" text, and is a number)
 export function isValidPropertyValue(value: string | number | null | undefined): boolean {
   if (value === null || value === undefined) return false

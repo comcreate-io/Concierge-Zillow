@@ -1169,6 +1169,17 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatExpirationDatePDF = (dateString: string) => {
+  const date = new Date(dateString)
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const seconds = date.getSeconds()
+  const isDateOnly = hours === 0 && minutes === 0 && seconds === 0
+  const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  if (isDateOnly) return datePart
+  return datePart + ' at ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFBuilderProps) {
   const company = {
     name: companyInfo?.name || 'CADIZ & LLUIS',
@@ -1372,7 +1383,7 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
               <Text style={styles.yachtFooterBrand}>{company.name}</Text>
               <Text style={styles.yachtFooterTagline}>{company.tagline}</Text>
               <Text style={styles.yachtFooterValidity}>
-                QUOTE VALID UNTIL {formatDate(quote.expiration_date).toUpperCase()}
+                QUOTE VALID UNTIL {formatExpirationDatePDF(quote.expiration_date).toUpperCase()}
               </Text>
               <Text style={styles.yachtFooterContact}>
                 {company.email} · {company.website}
@@ -1524,7 +1535,7 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
               <Text style={styles.carFooterBrand}>{company.name}</Text>
               <Text style={styles.carFooterTagline}>{company.tagline}</Text>
               <Text style={styles.carFooterValidity}>
-                QUOTE VALID UNTIL {formatDate(quote.expiration_date).toUpperCase()}
+                QUOTE VALID UNTIL {formatExpirationDatePDF(quote.expiration_date).toUpperCase()}
               </Text>
               <Text style={styles.carFooterContact}>
                 {company.email} · {company.website}
@@ -1727,7 +1738,7 @@ export function QuotePDFBuilder({ quote, customization, companyInfo }: QuotePDFB
             <Text style={styles.footerBrand}>CADIZ & LLUIS</Text>
             <Text style={styles.footerTagline}>Luxury Living</Text>
             <Text style={styles.footerText}>
-              Quote valid until {formatDate(quote.expiration_date)}
+              Quote valid until {formatExpirationDatePDF(quote.expiration_date)}
             </Text>
             <Text style={styles.footerContact}>
               {company.email} • {company.website}
