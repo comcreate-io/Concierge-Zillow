@@ -688,6 +688,32 @@ export async function updateQuotePDFCustomization(quoteId: string, customization
   return { success: true }
 }
 
+// Update quote expiration date (works on any status)
+export async function updateQuoteExpiration(quoteId: string, expirationDate: string) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('quotes')
+    .update({
+      expiration_date: expirationDate,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', quoteId)
+    .select('id, expiration_date')
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  if (!data || data.length === 0) {
+    return { error: 'Quote not found or update not permitted' }
+  }
+
+  revalidatePath('/admin/quotes')
+  revalidatePath('/', 'layout')
+  return { success: true, data: data[0] }
+}
+
 // Get quote PDF customization
 export async function getQuotePDFCustomization(quoteId: string) {
   const supabase = await createClient()
@@ -738,7 +764,10 @@ export async function duplicateQuote(quoteId: string) {
   // Generate new quote number
   const quoteNumber = await generateQuoteNumber(supabase)
 
-  // Create new quote as draft
+  // Create new quote as draft with fresh 14-day expiration
+  const freshExpiration = new Date()
+  freshExpiration.setDate(freshExpiration.getDate() + 14)
+
   const { data: newQuote, error: createError } = await supabase
     .from('quotes')
     .insert({
@@ -746,7 +775,7 @@ export async function duplicateQuote(quoteId: string) {
       manager_id: managerProfile.id,
       client_name: originalQuote.client_name,
       client_email: originalQuote.client_email,
-      expiration_date: originalQuote.expiration_date,
+      expiration_date: freshExpiration.toISOString(),
       status: 'draft',
       subtotal: originalQuote.subtotal,
       total: originalQuote.total,
@@ -928,11 +957,14 @@ export async function emailQuotePDF(quoteId: string) {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
+    const date = new Date(dateString)
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    const seconds = date.getSeconds()
+    const isDateOnly = hours === 0 && minutes === 0 && seconds === 0
+    const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    if (isDateOnly) return datePart
+    return datePart + ' at ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
   const quoteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/quote/${quote.quote_number}`
@@ -1313,11 +1345,14 @@ async function sendQuoteEmail(data: {
   }
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    })
+    const date = new Date(dateString)
+    const hours = date.getHours()
+    const minutes = date.getMinutes()
+    const seconds = date.getSeconds()
+    const isDateOnly = hours === 0 && minutes === 0 && seconds === 0
+    const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+    if (isDateOnly) return datePart
+    return datePart + ' at ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
   const quoteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/quote/${data.quoteNumber}`

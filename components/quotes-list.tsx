@@ -53,9 +53,17 @@ import {
   Pencil,
   UserCircle,
 } from 'lucide-react'
-import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice } from '@/lib/actions/quotes'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Quote, QuoteStatus, QuoteWithItems, deleteQuote, sendQuote, duplicateQuote, emailQuotePDF, convertQuoteToInvoice, updateQuoteExpiration } from '@/lib/actions/quotes'
 import { ManagerInfo } from '@/lib/actions/clients'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatExpirationDate } from '@/lib/utils'
 import { QuotePDFBuilderDialog } from './quote-pdf-builder-dialog'
 
 const statusConfig: Record<QuoteStatus, { label: string; color: string; icon: any }> = {
@@ -99,6 +107,10 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
   const [pdfBuilderOpen, setPdfBuilderOpen] = useState(false)
   const [selectedQuoteWithItems, setSelectedQuoteWithItems] = useState<QuoteWithItems | null>(null)
   const [isLoadingQuoteData, setIsLoadingQuoteData] = useState(false)
+  const [extendDialogOpen, setExtendDialogOpen] = useState(false)
+  const [isExtending, setIsExtending] = useState(false)
+  const [extendDurationValue, setExtendDurationValue] = useState(24)
+  const [extendDurationUnit, setExtendDurationUnit] = useState<'hours' | 'days'>('hours')
   const { toast } = useToast()
   const router = useRouter()
 
@@ -264,6 +276,40 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
     }
   }
 
+  const handleExtendExpiration = async () => {
+    if (!selectedQuote) return
+    setIsExtending(true)
+
+    const newExpiration = new Date()
+    if (extendDurationUnit === 'hours') {
+      newExpiration.setTime(newExpiration.getTime() + extendDurationValue * 60 * 60 * 1000)
+    } else {
+      newExpiration.setDate(newExpiration.getDate() + extendDurationValue)
+    }
+
+    const result = await updateQuoteExpiration(selectedQuote.id, newExpiration.toISOString())
+
+    if (result.error) {
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      })
+      setIsExtending(false)
+      return
+    }
+
+    toast({
+      title: 'Expiration updated',
+      description: `Quote ${selectedQuote.quote_number} now expires ${formatExpirationDate(newExpiration.toISOString())}.`,
+    })
+
+    setIsExtending(false)
+    setExtendDialogOpen(false)
+    setSelectedQuote(null)
+    router.refresh()
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -404,7 +450,7 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
                       <TableCell className={isExpired ? 'text-red-400' : 'text-white/70'}>
                         <div className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          {formatDate(quote.expiration_date)}
+                          {formatExpirationDate(quote.expiration_date)}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -458,6 +504,20 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
                                 title="Customize PDF"
                               >
                                 <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedQuote(quote)
+                                  setExtendDurationValue(24)
+                                  setExtendDurationUnit('hours')
+                                  setExtendDialogOpen(true)
+                                }}
+                                className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                                title="Update Expiration"
+                              >
+                                <Clock className="h-4 w-4" />
                               </Button>
                               {quote.status === 'accepted' && !quote.converted_to_invoice_id && (
                                 <Button
@@ -598,7 +658,7 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
                       <p className="text-xs text-white/70 mb-1">Expires</p>
                       <div className={`flex items-center gap-1 text-sm ${isExpired ? 'text-red-400' : 'text-white/70'}`}>
                         <Clock className="h-3 w-3" />
-                        {formatDate(quote.expiration_date)}
+                        {formatExpirationDate(quote.expiration_date)}
                       </div>
                     </div>
                   </div>
@@ -648,6 +708,20 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
                         >
                           <Pencil className="h-4 w-4 mr-2" />
                           Customize
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedQuote(quote)
+                            setExtendDurationValue(24)
+                            setExtendDurationUnit('hours')
+                            setExtendDialogOpen(true)
+                          }}
+                          className="text-orange-400 hover:text-orange-300 hover:bg-orange-500/10"
+                          title="Update Expiration"
+                        >
+                          <Clock className="h-4 w-4" />
                         </Button>
                         {quote.status === 'accepted' && !quote.converted_to_invoice_id && (
                           <Button
@@ -813,6 +887,59 @@ export function QuotesList({ quotes, managers = [], showManagerFilter = false, i
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Update Expiration Dialog */}
+      <Dialog open={extendDialogOpen} onOpenChange={setExtendDialogOpen}>
+        <DialogContent className="glass-card-accent border-white/20 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Update Expiration</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {selectedQuote && (
+              <p className="text-sm text-white/60">
+                Current expiration: {formatExpirationDate(selectedQuote.expiration_date)}
+              </p>
+            )}
+            <div className="space-y-2">
+              <Label className="text-white/90">New duration from now</Label>
+              <div className="flex gap-3">
+                <Input
+                  type="number"
+                  min={1}
+                  value={extendDurationValue}
+                  onChange={(e) => setExtendDurationValue(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="flex-1 bg-white/5 border-white/20 text-white"
+                />
+                <Select value={extendDurationUnit} onValueChange={(v: 'hours' | 'days') => setExtendDurationUnit(v)}>
+                  <SelectTrigger className="w-[120px] bg-white/5 border-white/20 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">Hours</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setExtendDialogOpen(false)}
+              className="border-white/20 text-white hover:bg-white/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleExtendExpiration}
+              disabled={isExtending}
+              className="bg-orange-500 hover:bg-orange-600 text-white"
+            >
+              {isExtending ? 'Saving...' : 'Update Expiration'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* PDF Builder Dialog */}
       {selectedQuoteWithItems && (
