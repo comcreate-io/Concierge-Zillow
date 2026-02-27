@@ -7,7 +7,7 @@ import {
   Font,
   Image,
 } from '@react-pdf/renderer'
-import { QuoteWithItems } from '@/lib/actions/quotes'
+import { QuoteWithItems, PDFCustomization, ServiceOverride } from '@/lib/actions/quotes'
 
 // Register fonts for luxury typography
 Font.register({
@@ -462,6 +462,17 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
   const quoteUrl = `${typeof window !== 'undefined' ? window.location.origin : ''}/quote/${quote.quote_number}`
   const isExpired = new Date(quote.expiration_date) < new Date()
 
+  const customization = quote.pdf_customization as PDFCustomization | null
+  const hiddenIds = customization?.hidden_service_items ?? []
+  const overrides = customization?.service_overrides ?? {}
+  const visibleItems = quote.service_items.filter(item => !hiddenIds.includes(item.id))
+
+  // Calculate effective total from visible items with overrides
+  const effectiveTotal = visibleItems.reduce((sum, item) => {
+    const override = overrides[item.id]
+    return sum + (override?.price_override ?? item.price)
+  }, 0)
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -514,35 +525,58 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
         {/* Service Items */}
         <View style={styles.serviceSection}>
           <Text style={styles.serviceSectionTitle}>Services & Experiences</Text>
-          {quote.service_items.map((item, index) => (
-            <View
-              key={item.id}
-              style={[
-                styles.serviceItem,
-                index === quote.service_items.length - 1 && styles.serviceItemLast
-              ]}
-            >
-              <View style={styles.serviceHeader}>
-                <Text style={styles.serviceName}>{item.service_name}</Text>
-                <Text style={styles.servicePrice}>{formatCurrency(item.price)}</Text>
-              </View>
-              {item.description && (
-                <Text style={styles.serviceDescription}>{item.description}</Text>
-              )}
-              {item.images && item.images.length > 0 && (
-                <View style={styles.serviceImages}>
-                  {item.images.slice(0, 3).map((imageUrl, imgIndex) => (
-                    <View key={imgIndex} style={styles.serviceImageContainer}>
-                      <Image
-                        src={imageUrl}
-                        style={styles.serviceImage}
-                      />
-                    </View>
-                  ))}
+          {visibleItems.map((item, index) => {
+            const override = overrides[item.id] as ServiceOverride | undefined
+            const displayName = override?.display_name || item.service_name
+            const displayDescription = override?.display_description ?? item.description
+            const displayImages = override?.display_images ?? item.images
+            const displayPrice = override?.price_override ?? item.price
+
+            return (
+              <View
+                key={item.id}
+                style={[
+                  styles.serviceItem,
+                  index === visibleItems.length - 1 && styles.serviceItemLast
+                ]}
+              >
+                <View style={styles.serviceHeader}>
+                  <Text style={styles.serviceName}>{displayName}</Text>
+                  <Text style={styles.servicePrice}>{formatCurrency(displayPrice)}</Text>
                 </View>
-              )}
+                {displayDescription && (
+                  <Text style={styles.serviceDescription}>{displayDescription}</Text>
+                )}
+                {displayImages && displayImages.length > 0 && (
+                  <View style={styles.serviceImages}>
+                    {displayImages.slice(0, 3).map((imageUrl, imgIndex) => (
+                      <View key={imgIndex} style={styles.serviceImageContainer}>
+                        <Image
+                          src={imageUrl}
+                          style={styles.serviceImage}
+                        />
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )
+          })}
+        </View>
+
+        {/* Totals */}
+        <View style={styles.totalsSection}>
+          <View style={styles.totalsBox}>
+            <View style={styles.totalsRow}>
+              <Text style={styles.totalsLabel}>Subtotal</Text>
+              <Text style={styles.totalsValue}>{formatCurrency(effectiveTotal)}</Text>
             </View>
-          ))}
+            <View style={styles.totalsDivider} />
+            <View style={styles.grandTotalRow}>
+              <Text style={styles.grandTotalLabel}>Total</Text>
+              <Text style={styles.grandTotalValue}>{formatCurrency(effectiveTotal)}</Text>
+            </View>
+          </View>
         </View>
 
         {/* Expiration Notice */}
@@ -558,10 +592,10 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
         )}
 
         {/* Notes */}
-        {quote.notes && (
+        {(customization?.custom_notes || quote.notes) && (
           <View style={styles.notesSection}>
             <Text style={styles.notesLabel}>Notes</Text>
-            <Text style={styles.notesText}>{quote.notes}</Text>
+            <Text style={styles.notesText}>{customization?.custom_notes || quote.notes}</Text>
           </View>
         )}
 
@@ -569,11 +603,7 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
         <View style={styles.termsSection}>
           <Text style={styles.termsTitle}>Terms & Conditions</Text>
           <Text style={styles.termsText}>
-            • All services are subject to availability at time of booking{'\n'}
-            • A deposit may be required to confirm your reservation{'\n'}
-            • Cancellation policies vary by service type{'\n'}
-            • Additional fees may apply for special requests or modifications{'\n'}
-            • Insurance and liability requirements apply to certain services
+            {customization?.custom_terms || `• All services are subject to availability at time of booking\n• A deposit may be required to confirm your reservation\n• Cancellation policies vary by service type\n• Additional fees may apply for special requests or modifications\n• Insurance and liability requirements apply to certain services`}
           </Text>
         </View>
 
