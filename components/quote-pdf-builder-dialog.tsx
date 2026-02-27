@@ -1378,24 +1378,28 @@ export function QuotePDFBuilderDialog({
                             </div>
                           )}
 
-                          {/* Passengers & Flight Time (for planes) */}
-                          {headerIcon === 'plane' && (
+                          {/* Passengers & Duration fields */}
+                          {(headerIcon === 'plane' || headerIcon === 'yacht' || headerIcon === 'car') && (
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label className="text-white/90 text-sm">Passengers</Label>
+                                <Label className="text-white/90 text-sm">
+                                  {headerIcon === 'yacht' ? 'Guests' : 'Passengers'}
+                                </Label>
                                 <Input
                                   value={override.passengers || ''}
                                   onChange={(e) => updateServiceOverride(item.id, 'passengers', e.target.value)}
-                                  placeholder="8"
+                                  placeholder={headerIcon === 'plane' ? '8' : headerIcon === 'yacht' ? '15' : '4'}
                                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                                 />
                               </div>
                               <div className="space-y-2">
-                                <Label className="text-white/90 text-sm">Flight Time</Label>
+                                <Label className="text-white/90 text-sm">
+                                  {headerIcon === 'plane' ? 'Flight Time' : 'Duration'}
+                                </Label>
                                 <Input
                                   value={override.flight_time || ''}
                                   onChange={(e) => updateServiceOverride(item.id, 'flight_time', e.target.value)}
-                                  placeholder="3h 27m"
+                                  placeholder={headerIcon === 'plane' ? '3h 27m' : headerIcon === 'yacht' ? '8h' : '3h'}
                                   className="bg-white/5 border-white/20 text-white placeholder:text-white/40"
                                 />
                               </div>
