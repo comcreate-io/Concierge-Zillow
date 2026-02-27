@@ -82,6 +82,24 @@ export type PDFCustomization = {
   accent_color?: string
 }
 
+// Calculate effective total considering price overrides and hidden items
+function calculateEffectiveTotal(
+  serviceItems: QuoteServiceItem[],
+  customization: PDFCustomization | null
+): { subtotal: number; total: number } {
+  const hiddenIds = customization?.hidden_service_items ?? []
+  const overrides = customization?.service_overrides ?? {}
+
+  let subtotal = 0
+  for (const item of serviceItems) {
+    if (hiddenIds.includes(item.id)) continue
+    const override = overrides[item.id]
+    subtotal += override?.price_override ?? item.price
+  }
+
+  return { subtotal, total: subtotal }
+}
+
 // Generate unique quote number (e.g., QT-2024-001)
 async function generateQuoteNumber(supabase: any): Promise<string> {
   const year = new Date().getFullYear()
@@ -639,10 +657,24 @@ export async function sendQuote(quoteId: string) {
 export async function updateQuotePDFCustomization(quoteId: string, customization: PDFCustomization) {
   const supabase = await createClient()
 
+  // Fetch service items to recalculate totals with new customization
+  const { data: serviceItems, error: itemsError } = await supabase
+    .from('quote_service_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+
+  if (itemsError) {
+    return { error: itemsError.message }
+  }
+
+  const { subtotal, total } = calculateEffectiveTotal(serviceItems || [], customization)
+
   const { error } = await supabase
     .from('quotes')
     .update({
       pdf_customization: customization,
+      subtotal,
+      total,
       updated_at: new Date().toISOString(),
     })
     .eq('id', quoteId)
@@ -905,17 +937,29 @@ export async function emailQuotePDF(quoteId: string) {
 
   const quoteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/quote/${quote.quote_number}`
 
-  const serviceItemsHtml = (serviceItems || []).map((item: QuoteServiceItem) => `
+  const pdfCustomization = quote.pdf_customization as PDFCustomization | null
+  const hiddenIds = pdfCustomization?.hidden_service_items ?? []
+  const overrides = pdfCustomization?.service_overrides ?? {}
+
+  const visibleItems = (serviceItems || []).filter((item: QuoteServiceItem) => !hiddenIds.includes(item.id))
+
+  const serviceItemsHtml = visibleItems.map((item: QuoteServiceItem) => {
+    const override = overrides[item.id]
+    const displayName = override?.display_name || item.service_name
+    const displayPrice = override?.price_override ?? item.price
+    const displayDesc = item.description
+    return `
     <tr>
       <td>
-        <div class="service-name">${item.service_name}</div>
-        ${item.description ? `<div class="service-desc">${item.description}</div>` : ''}
+        <div class="service-name">${displayName}</div>
+        ${displayDesc ? `<div class="service-desc">${displayDesc}</div>` : ''}
       </td>
       <td class="service-price">
-        ${formatCurrency(item.price)}
+        ${formatCurrency(displayPrice)}
       </td>
     </tr>
-  `).join('')
+  `
+  }).join('')
 
   const mailOptions = {
     from: process.env.SMTP_FROM,
@@ -1051,7 +1095,12 @@ Quote Number: ${quote.quote_number}
 Valid Until: ${formatDate(quote.expiration_date)}
 
 Services:
-${(serviceItems || []).map((item: QuoteServiceItem) => `- ${item.service_name}: ${formatCurrency(item.price)}`).join('\n')}
+${visibleItems.map((item: QuoteServiceItem) => {
+  const override = overrides[item.id]
+  const displayName = override?.display_name || item.service_name
+  const displayPrice = override?.price_override ?? item.price
+  return `- ${displayName}: ${formatCurrency(displayPrice)}`
+}).join('\n')}
 
 Total: ${formatCurrency(quote.total)}
 
@@ -1180,15 +1229,28 @@ export async function convertQuoteToInvoice(quoteId: string) {
     return { error: invoiceError.message }
   }
 
-  // Convert service items to line items (without photos)
-  if (serviceItems && serviceItems.length > 0) {
-    const lineItems = serviceItems.map((item: QuoteServiceItem) => ({
-      invoice_id: invoice.id,
-      description: item.description ? `${item.service_name} - ${item.description}` : item.service_name,
-      quantity: 1,
-      unit_price: item.price,
-      total: item.price,
-    }))
+  // Convert service items to line items (without photos), respecting overrides
+  const invoiceCustomization = quote.pdf_customization as PDFCustomization | null
+  const invoiceHiddenIds = invoiceCustomization?.hidden_service_items ?? []
+  const invoiceOverrides = invoiceCustomization?.service_overrides ?? {}
+
+  const visibleServiceItems = (serviceItems || []).filter(
+    (item: QuoteServiceItem) => !invoiceHiddenIds.includes(item.id)
+  )
+
+  if (visibleServiceItems.length > 0) {
+    const lineItems = visibleServiceItems.map((item: QuoteServiceItem) => {
+      const override = invoiceOverrides[item.id]
+      const displayName = override?.display_name || item.service_name
+      const effectivePrice = override?.price_override ?? item.price
+      return {
+        invoice_id: invoice.id,
+        description: item.description ? `${displayName} - ${item.description}` : displayName,
+        quantity: 1,
+        unit_price: effectivePrice,
+        total: effectivePrice,
+      }
+    })
 
     const { error: lineItemsError } = await supabase
       .from('invoice_line_items')
@@ -1436,13 +1498,28 @@ export async function addServiceItemToQuote(
     return { data: null, error: insertError.message }
   }
 
-  // Update quote totals
-  const newSubtotal = (quote.subtotal || 0) + serviceItem.price
+  // Fetch all items and pdf_customization to recalculate totals with overrides
+  const { data: allItems } = await supabase
+    .from('quote_service_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+
+  const { data: quoteData } = await supabase
+    .from('quotes')
+    .select('pdf_customization')
+    .eq('id', quoteId)
+    .single()
+
+  const { subtotal: newSubtotal, total: newTotal } = calculateEffectiveTotal(
+    allItems || [],
+    quoteData?.pdf_customization as PDFCustomization | null
+  )
+
   const { error: updateError } = await supabase
     .from('quotes')
     .update({
       subtotal: newSubtotal,
-      total: newSubtotal,
+      total: newTotal,
       updated_at: new Date().toISOString(),
     })
     .eq('id', quoteId)
@@ -1513,13 +1590,28 @@ export async function deleteServiceItemFromQuote(
     return { error: deleteError.message }
   }
 
-  // Update quote totals
-  const newSubtotal = Math.max(0, (quote.subtotal || 0) - serviceItem.price)
+  // Fetch remaining items and pdf_customization to recalculate totals with overrides
+  const { data: remainingItems } = await supabase
+    .from('quote_service_items')
+    .select('*')
+    .eq('quote_id', quoteId)
+
+  const { data: quoteData } = await supabase
+    .from('quotes')
+    .select('pdf_customization')
+    .eq('id', quoteId)
+    .single()
+
+  const { subtotal: newSubtotal, total: newTotal } = calculateEffectiveTotal(
+    remainingItems || [],
+    quoteData?.pdf_customization as PDFCustomization | null
+  )
+
   const { error: updateError } = await supabase
     .from('quotes')
     .update({
       subtotal: newSubtotal,
-      total: newSubtotal,
+      total: newTotal,
       updated_at: new Date().toISOString(),
     })
     .eq('id', quoteId)
