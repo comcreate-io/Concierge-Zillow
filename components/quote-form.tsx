@@ -22,13 +22,11 @@ import {
   Car,
   Plane,
   Ship,
-  Calendar,
+  Clock,
   Users,
 } from 'lucide-react'
 import { createQuote, updateQuote, QuoteWithItems } from '@/lib/actions/quotes'
 import { formatCurrency } from '@/lib/utils'
-import DatePicker from 'react-datepicker'
-import 'react-datepicker/dist/react-datepicker.css'
 
 interface ServiceItem {
   id?: string
@@ -85,9 +83,29 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
       }
     }
   }
-  const [expirationDate, setExpirationDate] = useState<Date | null>(
-    quote?.expiration_date ? new Date(quote.expiration_date) : null
-  )
+  // Duration-based expiration
+  const [durationValue, setDurationValue] = useState<number>(() => {
+    if (quote?.expiration_date) {
+      const expDate = new Date(quote.expiration_date)
+      const now = new Date()
+      const diffMs = expDate.getTime() - now.getTime()
+      const diffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)))
+      if (diffHours < 72) return diffHours
+      return Math.max(1, Math.round(diffHours / 24))
+    }
+    return 14
+  })
+  const [durationUnit, setDurationUnit] = useState<'hours' | 'days'>(() => {
+    if (quote?.expiration_date) {
+      const expDate = new Date(quote.expiration_date)
+      const now = new Date()
+      const diffMs = expDate.getTime() - now.getTime()
+      const diffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)))
+      if (diffHours < 72) return 'hours'
+      return 'days'
+    }
+    return 'days'
+  })
   const [notes, setNotes] = useState(quote?.notes || '')
   const [serviceItems, setServiceItems] = useState<ServiceItem[]>(
     quote?.service_items?.map(item => ({
@@ -314,8 +332,8 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
       toast({ title: 'Error', description: 'Valid client email is required', variant: 'destructive' })
       return
     }
-    if (!expirationDate) {
-      toast({ title: 'Error', description: 'Expiration date is required', variant: 'destructive' })
+    if (!durationValue || durationValue <= 0) {
+      toast({ title: 'Error', description: 'Valid duration is required', variant: 'destructive' })
       return
     }
 
@@ -359,10 +377,17 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
           }
         : null
 
+      // Compute expiration datetime from duration
+      const now = new Date()
+      const durationMs = durationUnit === 'hours'
+        ? durationValue * 60 * 60 * 1000
+        : durationValue * 24 * 60 * 60 * 1000
+      const expirationDate = new Date(now.getTime() + durationMs)
+
       const quoteData = {
         client_name: clientName.trim(),
         client_email: clientEmail.trim(),
-        expiration_date: expirationDate ? expirationDate.toISOString().split('T')[0] : '',
+        expiration_date: expirationDate.toISOString(),
         notes: notes.trim() || null,
         service_items: validItems.map(item => ({
           service_name: item.service_name.trim(),
@@ -474,31 +499,29 @@ export function QuoteForm({ quote, mode, clients = [], backUrl = '/admin/quotes'
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="expirationDate" className="text-white/90 uppercase tracking-wide text-sm font-semibold">Expiration Date *</Label>
-            <div className="relative w-full sm:w-64">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-white/70 pointer-events-none z-10" />
-              <DatePicker
-                selected={expirationDate}
-                onChange={(date: Date | null) => setExpirationDate(date)}
-                dateFormat="MM/dd/yyyy"
-                placeholderText="Select expiration date"
-                className="w-full pl-10 bg-white/5 border border-white/20 text-white placeholder:text-white/40 h-12 rounded-md px-3 focus:outline-none focus:ring-2 focus:ring-white/30"
-                calendarClassName="luxury-calendar"
-                wrapperClassName="w-full"
-                popperClassName="date-picker-popper"
-                withPortal
-                portalId="root-portal"
-                popperModifiers={[
-                  {
-                    name: 'zIndex',
-                    enabled: true,
-                    phase: 'write',
-                    fn: ({ state }) => {
-                      state.styles.popper.zIndex = 99999;
-                    },
-                  },
-                ]}
+            <Label htmlFor="durationValue" className="text-white/90 uppercase tracking-wide text-sm font-semibold flex items-center gap-2">
+              <Clock className="h-4 w-4" />
+              Quote Duration *
+            </Label>
+            <div className="flex items-center gap-3 w-full sm:w-80">
+              <Input
+                id="durationValue"
+                type="number"
+                min="1"
+                value={durationValue || ''}
+                onChange={(e) => setDurationValue(parseInt(e.target.value) || 0)}
+                placeholder="14"
+                className="w-24 bg-white/5 border-white/20 text-white placeholder:text-white/50 h-12"
               />
+              <Select value={durationUnit} onValueChange={(val: 'hours' | 'days') => setDurationUnit(val)}>
+                <SelectTrigger className="w-32 h-12 bg-white/5 border-white/20 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-gray-900 border-white/20">
+                  <SelectItem value="hours" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer">Hours</SelectItem>
+                  <SelectItem value="days" className="text-white hover:bg-white/10 focus:bg-white/10 focus:text-white cursor-pointer">Days</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </CardContent>

@@ -7,7 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/use-toast'
-import { QuoteWithItems, PDFCustomization, ServiceOverride, updateQuotePDFCustomization, addServiceItemToQuote, deleteServiceItemFromQuote } from '@/lib/actions/quotes'
+import { QuoteWithItems, PDFCustomization, ServiceOverride, updateQuotePDFCustomization, updateQuoteExpiration, addServiceItemToQuote, deleteServiceItemFromQuote } from '@/lib/actions/quotes'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   RotateCcw,
@@ -28,9 +35,10 @@ import {
   Car,
   Ship,
   User,
+  Clock,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatExpirationDate } from '@/lib/utils'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 
@@ -98,6 +106,11 @@ export function QuotePDFBuilderDialog({
   const newServiceFileInputRef = useRef<HTMLInputElement | null>(null)
   const [localQuote, setLocalQuote] = useState(quote)
 
+  // Expiration duration state
+  const [expirationDurationValue, setExpirationDurationValue] = useState(24)
+  const [expirationDurationUnit, setExpirationDurationUnit] = useState<'hours' | 'days'>('hours')
+  const [expirationChanged, setExpirationChanged] = useState(false)
+
   // Sync localQuote when quote prop changes
   useEffect(() => {
     setLocalQuote(quote)
@@ -141,6 +154,18 @@ export function QuotePDFBuilderDialog({
         }
       })
       setServiceOverrides(overrides)
+
+      // Initialize expiration duration from current expiration_date
+      const diffMs = new Date(localQuote.expiration_date).getTime() - Date.now()
+      const diffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)))
+      if (diffHours <= 72) {
+        setExpirationDurationValue(diffHours)
+        setExpirationDurationUnit('hours')
+      } else {
+        setExpirationDurationValue(Math.max(1, Math.round(diffHours / 24)))
+        setExpirationDurationUnit('days')
+      }
+      setExpirationChanged(false)
 
       // Reset add service form
       setShowAddServiceForm(false)
@@ -192,6 +217,26 @@ export function QuotePDFBuilderDialog({
           variant: 'destructive',
         })
       } else {
+        // Also update expiration if changed
+        if (expirationChanged) {
+          const newExpiration = new Date()
+          if (expirationDurationUnit === 'hours') {
+            newExpiration.setTime(newExpiration.getTime() + expirationDurationValue * 60 * 60 * 1000)
+          } else {
+            newExpiration.setDate(newExpiration.getDate() + expirationDurationValue)
+          }
+          const expResult = await updateQuoteExpiration(localQuote.id, newExpiration.toISOString())
+          if (expResult.error) {
+            toast({
+              title: 'Warning',
+              description: 'PDF saved but failed to update expiration: ' + expResult.error,
+              variant: 'destructive',
+            })
+          } else {
+            setLocalQuote(prev => ({ ...prev, expiration_date: newExpiration.toISOString() }))
+          }
+        }
+
         toast({
           title: 'Success',
           description: 'PDF customization saved successfully',
@@ -1558,6 +1603,47 @@ export function QuotePDFBuilderDialog({
 
                               </div>
 
+              {/* Quote Expiration Section */}
+              <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10">
+                <h3 className="text-base sm:text-lg font-semibold text-white flex items-center gap-2">
+                  <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Quote Expiration
+                </h3>
+                <p className="text-xs text-white/50">
+                  Current: {formatExpirationDate(localQuote.expiration_date)}
+                </p>
+                <div className="space-y-2">
+                  <Label className="text-white/90 text-xs sm:text-sm">New duration from now</Label>
+                  <div className="flex gap-3">
+                    <Input
+                      type="number"
+                      min={1}
+                      value={expirationDurationValue}
+                      onChange={(e) => {
+                        setExpirationDurationValue(Math.max(1, parseInt(e.target.value) || 1))
+                        setExpirationChanged(true)
+                      }}
+                      className="flex-1 bg-white/5 border-white/20 text-white text-sm"
+                    />
+                    <Select
+                      value={expirationDurationUnit}
+                      onValueChange={(v: 'hours' | 'days') => {
+                        setExpirationDurationUnit(v)
+                        setExpirationChanged(true)
+                      }}
+                    >
+                      <SelectTrigger className="w-[120px] bg-white/5 border-white/20 text-white text-sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="hours">Hours</SelectItem>
+                        <SelectItem value="days">Days</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+
               {/* Notes Section */}
               <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 glass-card-accent rounded-xl border border-white/10">
                 <h3 className="text-base sm:text-lg font-semibold text-white">Notes</h3>
@@ -1752,7 +1838,7 @@ export function QuotePDFBuilderDialog({
                       <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', letterSpacing: '2.8px', marginBottom: '7px' }}>CADIZ & LLUIS</p>
                       <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px' }}>LUXURY LIVING</p>
                       <p style={{ fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                        QUOTE VALID UNTIL {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                        QUOTE VALID UNTIL {formatExpirationDate(localQuote.expiration_date, { uppercase: true })}
                       </p>
                       <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>
                         {localQuote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
@@ -1912,7 +1998,7 @@ export function QuotePDFBuilderDialog({
                       <p style={{ fontSize: '18px', fontWeight: 700, color: 'white', letterSpacing: '2.5px', marginBottom: '5px' }}>CADIZ & LLUIS</p>
                       <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '1.8px', textTransform: 'uppercase', marginBottom: '16px' }}>LUXURY LIVING</p>
                       <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                        QUOTE VALID UNTIL {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                        QUOTE VALID UNTIL {formatExpirationDate(localQuote.expiration_date, { uppercase: true })}
                       </p>
                       <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)' }}>
                         {localQuote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
@@ -2122,7 +2208,7 @@ export function QuotePDFBuilderDialog({
                     <p className="text-lg font-bold text-white tracking-[0.2em] mb-1">CADIZ & LLUIS</p>
                     <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Luxury Living</p>
                     <p className="text-[10px] text-white uppercase tracking-wider mb-2">
-                      Quote valid until {new Date(localQuote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                      Quote valid until {formatExpirationDate(localQuote.expiration_date)}
                     </p>
                     <p className="text-[10px] text-gray-500">
                       {localQuote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
