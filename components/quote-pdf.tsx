@@ -432,6 +432,17 @@ const formatDate = (dateString: string) => {
   })
 }
 
+const formatExpirationDatePDF = (dateString: string) => {
+  const date = new Date(dateString)
+  const hours = date.getHours()
+  const minutes = date.getMinutes()
+  const seconds = date.getSeconds()
+  const isDateOnly = hours === 0 && minutes === 0 && seconds === 0
+  const datePart = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+  if (isDateOnly) return datePart
+  return datePart + ' at ' + date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+}
+
 const getStatusStyle = (status: string) => {
   switch (status) {
     case 'accepted':
@@ -511,7 +522,7 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
               Issue Date: {formatDate(quote.created_at)}
             </Text>
             <Text style={[styles.detailsTextLight, isExpired ? { color: '#991b1b' } : {}]}>
-              Valid Until: {formatDate(quote.expiration_date)}
+              Valid Until: {formatExpirationDatePDF(quote.expiration_date)}
               {isExpired && ' (EXPIRED)'}
             </Text>
             {quote.responded_at && (
@@ -584,7 +595,7 @@ export function QuotePDF({ quote, companyInfo }: QuotePDFProps) {
           <View style={styles.expirationSection}>
             <Text style={styles.expirationTitle}>Quote Validity</Text>
             <Text style={styles.expirationText}>
-              This quote is valid until {formatDate(quote.expiration_date)}.
+              This quote is valid until {formatExpirationDatePDF(quote.expiration_date)}.
               Prices and availability are subject to change after this date.
               Please respond before the expiration date to secure these rates.
             </Text>

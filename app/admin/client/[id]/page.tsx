@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import Link from 'next/link'
 import { ArrowLeft, ExternalLink, Copy, User, Mail, Phone, Share2, Target, FileText, Receipt, DollarSign, Calendar } from 'lucide-react'
-import { formatPhoneNumber } from '@/lib/utils'
+import { formatPhoneNumber, formatExpirationDate } from '@/lib/utils'
 import { ClientUrlDisplay } from '@/components/client-url-display'
 import { getInvoicesByClient } from '@/lib/actions/invoices'
 import { getQuotesByClient } from '@/lib/actions/quotes'
@@ -531,7 +531,7 @@ export default async function AdminClientPage({
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-3 w-3 sm:h-4 sm:w-4" />
-                          <span>Expires: {new Date(quote.expiration_date).toLocaleDateString()}</span>
+                          <span>Expires: {formatExpirationDate(quote.expiration_date)}</span>
                         </div>
                       </div>
                     </div>

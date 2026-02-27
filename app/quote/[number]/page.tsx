@@ -40,7 +40,7 @@ import {
 import Link from 'next/link'
 import { Logo } from '@/components/logo'
 import { getQuoteByNumber, acceptQuote, declineQuote, QuoteWithItems, QuoteStatus } from '@/lib/actions/quotes'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatExpirationDate } from '@/lib/utils'
 import html2canvas from 'html2canvas'
 import { jsPDF } from 'jspdf'
 
@@ -611,7 +611,7 @@ export default function QuoteViewPage() {
                   <div>
                     <p className="text-white/60 text-sm uppercase tracking-wider mb-1">Valid Until</p>
                     <p className={`font-medium ${isExpired ? 'text-red-400' : 'text-white'}`}>
-                      {formatDate(quote.expiration_date)}
+                      {formatExpirationDate(quote.expiration_date)}
                       {isExpired && ' (Expired)'}
                     </p>
                   </div>
@@ -1224,7 +1224,7 @@ export default function QuoteViewPage() {
               <p style={{ fontSize: '20px', fontWeight: 700, color: 'white', letterSpacing: '2.8px', marginBottom: '7px' }}>CADIZ & LLUIS</p>
               <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '2px', textTransform: 'uppercase', marginBottom: '20px' }}>LUXURY LIVING</p>
               <p style={{ fontSize: '12px', color: 'white', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px' }}>
-                QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                QUOTE VALID UNTIL {formatExpirationDate(quote.expiration_date, { uppercase: true })}
               </p>
               <p style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>
                 {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
@@ -1386,7 +1386,7 @@ export default function QuoteViewPage() {
               <p style={{ fontSize: '18px', fontWeight: 700, color: 'white', letterSpacing: '2.5px', marginBottom: '5px' }}>CADIZ & LLUIS</p>
               <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.6)', letterSpacing: '1.8px', textTransform: 'uppercase', marginBottom: '16px' }}>LUXURY LIVING</p>
               <p style={{ fontSize: '10px', color: 'white', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: '10px' }}>
-                QUOTE VALID UNTIL {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).toUpperCase()}
+                QUOTE VALID UNTIL {formatExpirationDate(quote.expiration_date, { uppercase: true })}
               </p>
               <p style={{ fontSize: '9px', color: 'rgba(255, 255, 255, 0.7)' }}>
                 {quote.manager_email || 'brody@cadizlluis.com'} · www.cadizlluis.com
@@ -1598,7 +1598,7 @@ export default function QuoteViewPage() {
             <p className="text-lg font-bold text-white tracking-[0.2em] mb-1">CADIZ & LLUIS</p>
             <p className="text-[10px] text-gray-400 uppercase tracking-widest mb-4">Luxury Living</p>
             <p className="text-[10px] text-white uppercase tracking-wider mb-2">
-              Quote valid until {new Date(quote.expiration_date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+              Quote valid until {formatExpirationDate(quote.expiration_date)}
             </p>
             <p className="text-[10px] text-gray-500">
               {quote.manager_email || 'info@cadizlluis.com'} · www.cadizlluis.com
