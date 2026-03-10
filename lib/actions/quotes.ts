@@ -910,8 +910,8 @@ export async function emailQuotePDF(quoteId: string) {
   try {
     const supabase = await createClient()
 
-    // Check if SMTP is configured
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    // Check if Resend is configured
+    if (!process.env.RESEND_API_KEY) {
       return { error: 'Email service is not configured. Please contact support.' }
     }
 
@@ -937,17 +937,7 @@ export async function emailQuotePDF(quoteId: string) {
     }
 
     // Send email with quote details
-    const nodemailer = await import('nodemailer')
-
-  const transporter = nodemailer.default.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+    const { sendEmail } = await import('@/lib/resend')
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -994,7 +984,6 @@ export async function emailQuotePDF(quoteId: string) {
   }).join('')
 
   const mailOptions = {
-    from: process.env.SMTP_FROM,
     to: quote.client_email,
     subject: `Service Quote ${quote.quote_number} - Cadiz & Lluis`,
     html: `
@@ -1149,7 +1138,7 @@ ${process.env.CONTACT_EMAIL || 'brody@cadizlluis.com'}
     `,
   }
 
-    await transporter.sendMail(mailOptions)
+    await sendEmail(mailOptions)
 
     // Update quote status to sent if it was draft
     if (quote.status === 'draft') {
@@ -1325,17 +1314,7 @@ async function sendQuoteEmail(data: {
   total: number
   managerName: string
 }) {
-  const nodemailer = await import('nodemailer')
-
-  const transporter = nodemailer.default.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+  const { sendEmail } = await import('@/lib/resend')
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -1358,7 +1337,6 @@ async function sendQuoteEmail(data: {
   const quoteUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/quote/${data.quoteNumber}`
 
   const mailOptions = {
-    from: process.env.SMTP_FROM,
     to: data.clientEmail,
     subject: `New Quote ${data.quoteNumber} from ${data.managerName}`,
     html: `
@@ -1472,7 +1450,7 @@ ${process.env.CONTACT_EMAIL || 'brody@cadizlluis.com'}
     `,
   }
 
-  await transporter.sendMail(mailOptions)
+  await sendEmail(mailOptions)
 }
 
 // Add a new service item to an existing quote

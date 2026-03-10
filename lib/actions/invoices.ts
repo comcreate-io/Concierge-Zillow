@@ -697,18 +697,7 @@ async function sendPaymentConfirmationEmail(data: {
   total: number
   paidAt: string
 }) {
-  // Dynamic import to avoid issues with server actions
-  const nodemailer = await import('nodemailer')
-
-  const transporter = nodemailer.default.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+  const { sendEmail } = await import('@/lib/resend')
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -730,7 +719,6 @@ async function sendPaymentConfirmationEmail(data: {
   const invoiceUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invoice/${data.invoiceNumber}`
 
   const mailOptions = {
-    from: process.env.SMTP_FROM,
     to: data.clientEmail,
     subject: `Payment Confirmed - Invoice ${data.invoiceNumber}`,
     html: `
@@ -855,7 +843,7 @@ ${process.env.CONTACT_EMAIL || 'brody@cadizlluis.com'}
     `,
   }
 
-  await transporter.sendMail(mailOptions)
+  await sendEmail(mailOptions)
 }
 
 // Send invoice email to client
@@ -870,17 +858,7 @@ async function sendInvoiceEmail(data: {
   total: number
   managerName: string
 }) {
-  const nodemailer = await import('nodemailer')
-
-  const transporter = nodemailer.default.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: process.env.SMTP_SECURE === 'true',
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  })
+  const { sendEmail } = await import('@/lib/resend')
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -900,7 +878,6 @@ async function sendInvoiceEmail(data: {
   const paymentUrl = `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/invoice/${data.invoiceNumber}/pay`
 
   const mailOptions = {
-    from: process.env.SMTP_FROM,
     to: data.clientEmail,
     subject: `New Invoice ${data.invoiceNumber} - Cadiz & Lluis`,
     html: `
@@ -1026,5 +1003,5 @@ ${process.env.CONTACT_EMAIL || 'brody@cadizlluis.com'}
     `,
   }
 
-  await transporter.sendMail(mailOptions)
+  await sendEmail(mailOptions)
 }
