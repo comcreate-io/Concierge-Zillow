@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { sendEmail } from '@/lib/resend'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,21 +23,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
-    // Email content for admin
-    const adminMailOptions = {
-      from: process.env.SMTP_FROM,
-      to: process.env.CONTACT_EMAIL,
+    // Send admin notification
+    await sendEmail({
+      to: process.env.CONTACT_EMAIL || 'brody@cadizlluis.com',
       subject: `New Contact Form Submission - ${name}`,
       html: `
         <!DOCTYPE html>
@@ -101,11 +89,10 @@ ${message}
 
 Received on ${new Date().toLocaleString()}
       `,
-    }
+    })
 
-    // Email confirmation for user
-    const userMailOptions = {
-      from: process.env.SMTP_FROM,
+    // Send user confirmation
+    await sendEmail({
       to: email,
       subject: 'Thank You for Contacting Luxury Concierge',
       html: `
@@ -165,11 +152,7 @@ Cadiz & Lluis
 
 ${process.env.CONTACT_EMAIL}
       `,
-    }
-
-    // Send emails
-    await transporter.sendMail(adminMailOptions)
-    await transporter.sendMail(userMailOptions)
+    })
 
     return NextResponse.json(
       { message: 'Email sent successfully' },

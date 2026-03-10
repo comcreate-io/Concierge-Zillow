@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { sendEmail } from '@/lib/resend'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,21 +30,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create transporter
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT || '587'),
-      secure: process.env.SMTP_SECURE === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-    })
-
     // Email content for property managers
     const managerMailOptions = {
-      from: process.env.SMTP_FROM,
-      to: managerEmails.join(', '),
+      to: managerEmails as string[],
       subject: `Property Inquiry: ${propertyAddress}`,
       html: `
         <!DOCTYPE html>
@@ -124,7 +112,6 @@ Please respond to the customer within 24 hours.
 
     // Email confirmation for user
     const userMailOptions = {
-      from: process.env.SMTP_FROM,
       to: email,
       subject: `Your Inquiry About ${propertyAddress}`,
       html: `
@@ -199,8 +186,8 @@ ${process.env.CONTACT_EMAIL}
     }
 
     // Send emails
-    await transporter.sendMail(managerMailOptions)
-    await transporter.sendMail(userMailOptions)
+    await sendEmail(managerMailOptions)
+    await sendEmail(userMailOptions)
 
     return NextResponse.json(
       { message: 'Inquiry sent successfully' },
